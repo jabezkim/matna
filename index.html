@@ -1478,7 +1478,7 @@ function renderCMonthly() {
     chartCMonthly=new Chart(document.getElementById('cvCMonthly').getContext('2d'),{type:'bar',data:{labels:months,datasets:tops.map((m,i)=>({label:m.name,data:months.map(mo=>Math.round(m.tn*W.monthW[mo])),backgroundColor:CC[i%CC.length]+'cc',borderRadius:2}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(0)+'만'}}}}});
 
     let th='<tr><th>월</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">월합계</th></tr>';
-    document.querySelector('#tblC_Monthly thead').innerHTML=th;
+    document.querySelector('#tblC_Monthly 대ead').innerHTML=th;
     document.querySelector('#tblC_Monthly tbody').innerHTML=months.map(mo=>{
         const vals=tops.map(m=>Math.round(m.tn*W.monthW[mo]));
         return`<tr><td style="font-weight:700;background:#f8fafc">${mo}</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(vals.reduce((s,v)=>s+v,0))}</td></tr>`;
@@ -1666,10 +1666,90 @@ function downloadExcelC() {
     saveExcel(wb, `맛나감자탕_단독매장_통합리포트_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
+// ── 수정된 copyForAIC 함수 ──
 function copyForAIC() {
-    if(!_cWeights) return; const store=document.getElementById('storeSelC').value, W=_cWeights; const totalB=parsedB.reduce((s,r)=>s+r.tn,0)||1;
-    const peakDay=DAY_ORDER.filter(d=>W.dayAgg[d]>0).sort((a,b)=>W.dayAgg[b]-W.dayAgg[a])[0]||'-'; const peakSeg=SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)})).sort((a,b)=>b.sales-a.sales)[0];
-    let r=`[맛나감자탕 ${store} 경영 분석 리포트]\n\n`; r+=`■ 기간 총매출: ${fmt(_cTotalA)}원 | 분석 메뉴: ${parsedB.length}종\n`; r+=`■ 피크 요일: ${peakDay}요일 | 피크 시간대: ${peakSeg?.name||'-'}\n\n`; r+=`■ 베스트 메뉴 TOP 10\n`+_cSortedB.slice(0,10).map((m,i)=>`${i+1}위: ${m.name} (${fmt(m.tn)}원, ${((m.tn/totalB)*100).toFixed(1)}%)`).join('\n'); r+=`\n\n■ 요일별 총매출\n`+DAY_ORDER.filter(d=>W.dayAgg[d]>0).map(d=>`${d}요일: ${fmt(W.dayAgg[d])}원`).join(' | '); r+=`\n\n■ 시간대별 총매출\n`+SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)})).filter(s=>s.sales>0).map(s=>`${s.name}: ${fmt(s.sales)}원`).join(' | '); r+=`\n\n위 데이터를 바탕으로 이 매장의 현재 상황을 진단하고, 매출 극대화를 위한 구체적 실행 방안 5가지를 단계별로 제시해줘.`; copyToClipboard(r, 'AI 경영 상담 데이터 복사 완료!\nClaude나 ChatGPT에 붙여넣어 활용하세요.');
+    if(!_cWeights) return; 
+    const store = document.getElementById('storeSelC').value; 
+    
+    // 현재 활성화된 탭 이름을 한글로 변환
+    const tabNames = {
+        overview: '종합 개요', monthly: '월별 메뉴', weekday: '요일별 메뉴', 
+        daily: '일별 메뉴', hourly: '시간별 메뉴', catrank: '카테고리별 TOP10', 
+        signal: '판매 이상 감지', strategy: '경영전략'
+    };
+    const currentTabName = tabNames[curCTab] || curCTab;
+    let report = `[맛나감자탕 ${store} 경영 분석 리포트 - 현재 탭: ${currentTabName}]\n\n`;
+
+    // 1. 현재 탭에 따라 추출할 테이블 ID 및 필터 정보 설정
+    let tableIds = [];
+    let filterText = '';
+
+    if (curCTab === 'overview') {
+        tableIds = ['tblC_Top', 'tblC_Weekday', 'tblC_Hour'];
+    } else if (['monthly', 'weekday', 'daily', 'hourly'].includes(curCTab)) {
+        const map = { monthly: 'tblC_Monthly', weekday: 'tblC_WeekdayDetail', daily: 'tblC_Daily', hourly: 'tblC_HourlyDetail' };
+        tableIds = [map[curCTab]];
+        
+        // 사용자가 선택한 카테고리와 메뉴 필터 정보 추가
+        const catSel = document.getElementById(curCTab + 'Cat');
+        if (catSel) {
+            filterText = `■ 분석 기준: ${catSel.options[catSel.selectedIndex].text}\n`;
+            if (['감자탕', '뼈찜', '간장뼈찜', '뼈구이'].includes(catSel.value)) {
+                const checked = Array.from(document.querySelectorAll(`#${curCTab}MenuCheckboxes input:checked`)).map(cb => cb.value);
+                filterText += `■ 선택된 세부 메뉴: ${checked.join(', ')}\n`;
+            }
+            filterText += '\n';
+        }
+    } else if (curCTab === 'catrank') {
+        tableIds = ['tblCat_감자탕', 'tblCat_뼈찜', 'tblCat_뼈구이', 'tblCat_간장뼈찜', 'tblCat_식사'];
+    } else if (curCTab === 'signal') {
+        tableIds = ['tblSigDaily', 'tblSigWeekday', 'tblSigMonth'];
+        filterText = `■ 분석 카테고리: ${_sigCat}\n\n`;
+    } else if (curCTab === 'strategy') {
+        tableIds = ['tblABC'];
+    }
+
+    report += filterText;
+
+    // 2. 설정된 테이블 ID를 순회하며 화면에 보이는 텍스트 추출
+    let hasData = false;
+    tableIds.forEach(tId => {
+        const table = document.getElementById(tId);
+        if (table) {
+            // 테이블 위에 있는 패널 제목 추출
+            const titleEl = table.closest('.panel')?.querySelector('.panel-t');
+            if (titleEl) report += `[${titleEl.innerText.trim()}]\n`;
+            
+            // 헤더(th) 추출
+            const ths = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim()).join('\t');
+            if (ths) {
+                report += ths + '\n';
+                // 본문(td) 추출 (토큰 제한 방지를 위해 최대 30행 제한)
+                const trs = Array.from(table.querySelectorAll('tbody tr')).slice(0, 30);
+                trs.forEach(tr => {
+                    report += Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()).join('\t') + '\n';
+                });
+                report += '\n';
+                hasData = true;
+            }
+        }
+    });
+
+    // 3. 만약 화면에서 데이터를 못 찾았을 경우의 예비용(Fallback) 로직
+    if (!hasData) {
+        const W = _cWeights; const totalB = parsedB.reduce((s,r) => s + r.tn, 0) || 1;
+        const peakDay = DAY_ORDER.filter(d => W.dayAgg[d] > 0).sort((a,b) => W.dayAgg[b] - W.dayAgg[a])[0] || '-'; 
+        const peakSeg = SEGS.map(s => ({...s, sales: s.hours.reduce((sum,h) => sum + (W.hourAgg[h] || 0), 0)})).sort((a,b) => b.sales - a.sales)[0];
+        
+        report += `■ 기간 총매출: ${fmt(_cTotalA)}원 | 분석 메뉴: ${parsedB.length}종\n`;
+        report += `■ 피크 요일: ${peakDay}요일 | 피크 시간대: ${peakSeg?.name || '-'}\n\n`; 
+        report += `■ 베스트 메뉴 TOP 10\n` + _cSortedB.slice(0,10).map((m,i) => `${i+1}위: ${m.name} (${fmt(m.tn)}원, ${((m.tn/totalB)*100).toFixed(1)}%)`).join('\n');
+    }
+
+    report += `\n위 데이터를 바탕으로 현재 상황을 진단하고, 우리 매장의 매출 극대화를 위한 맞춤형 마케팅 및 운영 전략을 구체적으로 제안해줘.`;
+    
+    // 4. 클립보드 복사 실행
+    copyToClipboard(report, 'AI 경영 상담 데이터 복사 완료!\\n현재 화면에 선택하신 데이터가 복사되었습니다.\\nClaude나 ChatGPT에 붙여넣어 활용하세요.');
 }
 
 </script>
