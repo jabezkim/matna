@@ -305,7 +305,7 @@ self.addEventListener('fetch', e => {
                     <p style="margin-bottom:6px;font-size:14px;"><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
                     <small style="color:#9ca3af;font-size:12px;">포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
                     <div style="margin-top:20px;">
-                        <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple
+                        <input type="file" id="fiA" multiple
                             style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
                     </div>
                 </div>
@@ -409,7 +409,7 @@ self.addEventListener('fetch', e => {
                     <p style="margin-bottom:6px;font-size:14px;"><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
                     <small style="color:#9ca3af;font-size:12px;">상품별 양식 (.xlsx, .xls, .csv)</small>
                     <div style="margin-top:20px;">
-                        <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple
+                        <input type="file" id="fiB" multiple
                             style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
                     </div>
                 </div>
@@ -946,9 +946,12 @@ function clickTabA(btn) {
 
 async function loadA(files){
   if(!files || files.length === 0) return;
+  // 엑셀 파일만 필터
+  const excelFiles = Array.from(files).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+  if(!excelFiles.length) { alert('엑셀 파일(.xlsx, .xls, .csv)을 선택해주세요.'); return; }
   document.getElementById('upA').classList.add('hidden');
   let allRecords = [];
-  for (let file of files) {
+  for (let file of excelFiles) {
       const data = await readFileAsync(file);
       const wb = XLSX.read(data, {type:'array'});
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
@@ -1472,10 +1475,13 @@ function getCategory(name, rawCat, ch) {
 
 async function loadB(files){
   if(!files || files.length === 0) return;
+  // 엑셀 파일만 필터
+  const excelFiles = Array.from(files).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+  if(!excelFiles.length) { alert('엑셀 파일(.xlsx, .xls, .csv)을 선택해주세요.'); return; }
   document.getElementById('upB').classList.add('hidden');
   const rawList = []; // { store, name, cat, tq, net, ch }
 
-  for (let file of files) {
+  for (let file of excelFiles) {
       const data = await readFileAsync(file);
       const wb = XLSX.read(data, {type:'array'});
       const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
