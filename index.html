@@ -1529,6 +1529,7 @@ async function loadB(files){
       const h = raw[headerIdx].map(v => String(v||'').replace(/\s/g,''));
 
       const CI = {
+          date:  h.findIndex(v => v === '일자' || v === '날짜' || v === '일시'),
           cat:   h.findIndex(v => v.includes('대분류') || v === '분류'),
           name:  h.findIndex(v => v === '상품명'),
           qty:   h.findIndex(v => v === '수량'),
@@ -1549,6 +1550,31 @@ async function loadB(files){
           const rawCat = CI.cat>=0 ? String(r[CI.cat]||'').trim() : '';
           const qty    = CI.qty>=0 ? parseFloat(String(r[CI.qty]||'0').replace(/,/g,''))||0 : 0;
 
+          // 날짜 파싱
+          let date = '';
+          if(CI.date >= 0) {
+              const rawDate = r[CI.date];
+              if(rawDate) {
+                  // 숫자형(엑셀 시리얼) 또는 문자열 처리
+                  if(typeof rawDate === 'number') {
+                      const d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                      const mm = String(d.getMonth()+1).padStart(2,'0');
+                      const dd = String(d.getDate()).padStart(2,'0');
+                      date = `${mm}-${dd}`;
+                  } else {
+                      const s = String(rawDate).trim();
+                      // YYYY-MM-DD, MM-DD, YYYY/MM/DD 등 다양한 형식
+                      const m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+                      if(m) date = `${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+                      else {
+                          const m2 = s.match(/(\d{1,2})[.\-\/](\d{1,2})/);
+                          if(m2) date = `${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
+                          else date = s.substring(0,10);
+                      }
+                  }
+              }
+          }
+
           let store = fileStoreName;
           if(CI.store >= 0) {
               const s = String(r[CI.store]||'').trim();
@@ -1562,7 +1588,7 @@ async function loadB(files){
 
           const normName = normalizeMenuName(rawName);
           const finalCat = getCategory(normName, cleanStr(rawCat), ch);
-          rawList.push({ store, name: normName, cat: finalCat, tq: qty, net, ch });
+          rawList.push({ date, store, name: normName, cat: finalCat, tq: qty, net, ch });
       });
   }
 
@@ -1602,10 +1628,15 @@ function buildParsedB(storeFilter) {
     const map = {};
     src.forEach(r => {
         const key = r.name + '|||' + r.cat;
-        if(!map[key]) map[key] = { name:r.name, cat:r.cat, tq:0, tn:0, ch:{'일반 홀':0,'티오더(홀)':0,'배달':0,'포장':0} };
+        if(!map[key]) map[key] = { name:r.name, cat:r.cat, tq:0, tn:0, ch:{'일반 홀':0,'티오더(홀)':0,'배달':0,'포장':0}, dates:{} };
         map[key].tq += r.tq;
         map[key].tn += r.net;
-        map[key].ch[r.ch] += r.net;
+        map[key].ch[r.ch] = (map[key].ch[r.ch]||0) + r.net;
+        // 날짜별 실매출 누적
+        if(r.date) {
+            if(!map[key].dates[r.date]) map[key].dates[r.date] = 0;
+            map[key].dates[r.date] += r.net;
+        }
     });
     return Object.values(map);
 }
@@ -2188,6 +2219,26 @@ function renderCCatRank() {
 // ── 판매 이상 감지 — 카테고리 합산 기반 변화량·변화율 ─────────────
 let _sigCat = '감자탕';
 
+// 카테고리별 날짜별 실매출 집계 (B데이터 dates 필드 활용)
+function getCatDateSales(cat) {
+    // 해당 카테고리 메뉴들의 dates 합산
+    const items = cat === '배달'
+        ? parsedB.filter(r=>r.ch['배달']>0)
+        : parsedB.filter(r=>r.cat===cat);
+
+    const dateSales = {};
+    items.forEach(m => {
+        if(m.dates && Object.keys(m.dates).length > 0) {
+            // 실제 날짜 데이터 있음
+            Object.entries(m.dates).forEach(([date, sales]) => {
+                const s = cat === '배달' ? (m.ch['배달'] * sales / (m.tn||1)) : sales;
+                dateSales[date] = (dateSales[date]||0) + s;
+            });
+        }
+    });
+    return dateSales; // { "MM-DD": 매출액, ... }
+}
+
 function getCatSales(cat) {
     if(cat === '배달') return parsedB.reduce((s,r)=>s+(r.ch['배달']||0),0);
     return parsedB.filter(r=>r.cat===cat).reduce((s,r)=>s+r.tn,0);
@@ -2203,7 +2254,7 @@ function sigTable(elId, rows) {
     }
     el.querySelector('thead').innerHTML=`<tr>
         <th>순위</th><th>기간</th>
-        <th class="num">추정 매출</th>
+        <th class="num">실제 매출</th>
         <th class="num">평균 매출</th>
         <th class="num">변화량 (Δ)</th>
         <th class="num">변화율</th>
@@ -2213,7 +2264,7 @@ function sigTable(elId, rows) {
         const dColor = r.delta>=0?'#059669':'#dc2626';
         const rColor = r.rate>=0?'#059669':'#dc2626';
         const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
-        const bg = i<3?'background:#fffbeb;':'';
+        const bg = i<3?'background:#fffbeb;':''
         return `<tr style="${bg}">
             <td style="font-weight:700;color:#64748b;font-size:13px">${medal||i+1}</td>
             <td style="font-weight:700">${r.label}</td>
@@ -2230,86 +2281,139 @@ function switchSigCat(cat, btn) {
     document.querySelectorAll('#sigCatTabs .tab').forEach(t=>t.classList.remove('on'));
     if(btn) btn.classList.add('on');
     const lbl = document.getElementById('sigCatLabel');
-    if(lbl) lbl.textContent = `현재 카테고리: ${cat} (카테고리 합산 기준)`;
+    if(lbl) lbl.textContent = `현재 카테고리: ${cat}`;
     renderSigTables(cat);
 }
 
 function renderSigTables(cat) {
     if(!_cWeights) return;
     const W = _cWeights;
-    const total = getCatSales(cat);
-    const noData = `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">${cat} 카테고리 매출 데이터 없음</td></tr>`;
 
-    if(!total) {
-        ['tblSigDaily','tblSigWeekday','tblSigMonth'].forEach(id=>{
-            const el=document.getElementById(id); if(!el) return;
-            el.querySelector('thead').innerHTML='';
-            el.querySelector('tbody').innerHTML=noData;
-        });
-        return;
+    // B데이터에 날짜 데이터가 있는지 확인
+    const hasDates = parsedBRaw.some(r=>r.date && r.date.length > 0);
+    const noDataMsg = `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">${cat} 카테고리 데이터 없음</td></tr>`;
+
+    // ── 날짜별 실매출 or 가중치 추정 ──
+    function getDateRows() {
+        if(hasDates) {
+            // 실제 날짜 데이터 사용
+            const dateSales = getCatDateSales(cat);
+            const dates = Object.keys(dateSales).sort();
+            if(dates.length < 2) return null;
+            const vals = dates.map(d=>dateSales[d]);
+            const avg = vals.reduce((s,v)=>s+v,0)/vals.length||1;
+            return dates.map((d,i)=>{
+                const val=vals[i], delta=val-avg, rate=(delta/avg)*100;
+                const dayInfo=_cDataA.find(r=>r.date===d||r.date.endsWith(d));
+                const label=d+(dayInfo?`(${dayInfo.day})`:'');
+                return {label,val,avg,delta,rate};
+            }).filter(r=>Math.abs(r.rate)>5).sort((a,b)=>b.rate-a.rate).slice(0,20);
+        } else {
+            // 가중치 추정 (폴백)
+            const total = getCatSales(cat);
+            if(!total) return null;
+            const allDates=Object.keys(W.dateAgg).sort();
+            if(allDates.length<2) return null;
+            const vals=allDates.map(d=>total*(W.dateW[d]||0));
+            const avg=vals.reduce((s,v)=>s+v,0)/vals.length||1;
+            return allDates.map((d,i)=>{
+                const val=vals[i],delta=val-avg,rate=(delta/avg)*100;
+                const dayInfo=_cDataA.find(r=>r.date===d);
+                const label=d+(dayInfo?`(${dayInfo.day})`:'');
+                return {label,val,avg,delta,rate};
+            }).filter(r=>Math.abs(r.rate)>5).sort((a,b)=>b.rate-a.rate).slice(0,20);
+        }
     }
 
     // [1] 일별
-    const allDates = Object.keys(W.dateAgg).sort();
-    if(allDates.length >= 2) {
-        const dailyVals = allDates.map(d => total * (W.dateW[d]||0));
-        const avg = dailyVals.reduce((s,v)=>s+v,0) / dailyVals.length || 1;
-        const rows = allDates.map((d,i) => {
-            const val = dailyVals[i];
-            const delta = val - avg;
-            const rate = (delta/avg)*100;
-            const dayInfo = _cDataA.find(r=>r.date===d);
-            const label = d + (dayInfo?`(${dayInfo.day})`:'');
-            return { label, val, avg, delta, rate };
-        })
-        .filter(r => Math.abs(r.rate) > 5)
-        .sort((a,b) => b.rate - a.rate)
-        .slice(0, 20);
-        sigTable('tblSigDaily', rows);
-    } else {
+    const dateRows = getDateRows();
+    if(!dateRows) {
         const el=document.getElementById('tblSigDaily');
-        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">3일 이상 데이터가 필요합니다</td></tr>'; }
+        if(el){el.querySelector('thead').innerHTML='';el.querySelector('tbody').innerHTML=`<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">3일 이상 데이터 필요</td></tr>`;}
+    } else {
+        const dataLabel = hasDates ? '실제 매출' : '추정 매출 (가중치)';
+        const el=document.getElementById('tblSigDaily');
+        if(el){
+            sigTable('tblSigDaily', dateRows);
+            // 헤더 첫번째 데이터 컬럼명 업데이트
+            const th = el.querySelector('thead tr th:nth-child(3)');
+            if(th) th.textContent = dataLabel;
+        }
     }
 
     // [2] 요일별
-    const activeDays = DAY_ORDER.filter(d=>W.dayAgg[d]>0);
+    const activeDays=DAY_ORDER.filter(d=>W.dayAgg[d]>0);
     if(activeDays.length >= 2) {
-        const dayVals = activeDays.map(d => total * (W.dayW[d]||0));
-        const avg = dayVals.reduce((s,v)=>s+v,0) / dayVals.length || 1;
-        const rows = activeDays.map((d,i) => {
-            const val = dayVals[i];
-            const delta = val - avg;
-            const rate = (delta/avg)*100;
-            return { label: d+'요일', val, avg, delta, rate };
-        }).sort((a,b) => b.rate - a.rate).slice(0,20);
-        sigTable('tblSigWeekday', rows);
-    } else {
-        const el=document.getElementById('tblSigWeekday');
-        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">2개 이상 요일 데이터가 필요합니다</td></tr>'; }
+        let dayRows;
+        if(hasDates) {
+            // 날짜 데이터로 요일별 집계
+            const dateSales = getCatDateSales(cat);
+            const dayAgg = {};
+            const dayCount = {};
+            Object.entries(dateSales).forEach(([date, sales])=>{
+                const info = _cDataA.find(r=>r.date===date||r.date.endsWith(date));
+                if(info) {
+                    dayAgg[info.day]=(dayAgg[info.day]||0)+sales;
+                    dayCount[info.day]=(dayCount[info.day]||0)+1;
+                }
+            });
+            const days = DAY_ORDER.filter(d=>dayAgg[d]);
+            if(days.length>=2){
+                const vals=days.map(d=>dayAgg[d]/(dayCount[d]||1));
+                const avg=vals.reduce((s,v)=>s+v,0)/vals.length||1;
+                dayRows=days.map((d,i)=>{const val=vals[i],delta=val-avg,rate=(delta/avg)*100;return{label:d+'요일',val,avg,delta,rate};}).sort((a,b)=>b.rate-a.rate).slice(0,20);
+            }
+        }
+        if(!dayRows){
+            // 폴백: 가중치
+            const total=getCatSales(cat);
+            if(total){
+                const vals=activeDays.map(d=>total*(W.dayW[d]||0));
+                const avg=vals.reduce((s,v)=>s+v,0)/vals.length||1;
+                dayRows=activeDays.map((d,i)=>{const val=vals[i],delta=val-avg,rate=(delta/avg)*100;return{label:d+'요일',val,avg,delta,rate};}).sort((a,b)=>b.rate-a.rate).slice(0,20);
+            }
+        }
+        if(dayRows) sigTable('tblSigWeekday', dayRows);
     }
 
     // [3] 월별
-    const activeMonths = Object.keys(W.monthAgg).filter(k=>W.monthAgg[k]>0).sort();
-    if(activeMonths.length >= 2) {
-        const monthVals = activeMonths.map(mo => total * (W.monthW[mo]||0));
-        const avg = monthVals.reduce((s,v)=>s+v,0) / monthVals.length || 1;
-        const rows = activeMonths.map((mo,i) => {
-            const val = monthVals[i];
-            const delta = val - avg;
-            const rate = (delta/avg)*100;
-            return { label: mo, val, avg, delta, rate };
-        }).sort((a,b) => b.rate - a.rate).slice(0,20);
-        sigTable('tblSigMonth', rows);
-    } else {
-        const el=document.getElementById('tblSigMonth');
-        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">2개월 이상 데이터가 필요합니다</td></tr>'; }
+    const total=getCatSales(cat);
+    if(hasDates) {
+        const dateSales=getCatDateSales(cat);
+        const monthAgg={};
+        Object.entries(dateSales).forEach(([date,sales])=>{
+            const mo=date.substring(0,2)+'월';
+            monthAgg[mo]=(monthAgg[mo]||0)+sales;
+        });
+        const months=Object.keys(monthAgg).sort();
+        if(months.length>=2){
+            const vals=months.map(m=>monthAgg[m]);
+            const avg=vals.reduce((s,v)=>s+v,0)/vals.length||1;
+            const rows=months.map((m,i)=>{const val=vals[i],delta=val-avg,rate=(delta/avg)*100;return{label:m,val,avg,delta,rate};}).sort((a,b)=>b.rate-a.rate).slice(0,20);
+            sigTable('tblSigMonth',rows);
+        } else {
+            const el=document.getElementById('tblSigMonth');
+            if(el){el.querySelector('thead').innerHTML='';el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">2개월 이상 데이터 필요</td></tr>';}
+        }
+    } else if(total) {
+        const activeMonths=Object.keys(W.monthAgg).filter(k=>W.monthAgg[k]>0).sort();
+        if(activeMonths.length>=2){
+            const vals=activeMonths.map(mo=>total*(W.monthW[mo]||0));
+            const avg=vals.reduce((s,v)=>s+v,0)/vals.length||1;
+            const rows=activeMonths.map((mo,i)=>{const val=vals[i],delta=val-avg,rate=(delta/avg)*100;return{label:mo,val,avg,delta,rate};}).sort((a,b)=>b.rate-a.rate).slice(0,20);
+            sigTable('tblSigMonth',rows);
+        }
     }
+
+    // 안내 업데이트
+    const lbl=document.getElementById('sigCatLabel');
+    if(lbl) lbl.textContent=`현재 카테고리: ${cat} (${hasDates?'실제 날짜 데이터 기반':'가중치 추정 기반'})`;
 }
 
 function renderCSignal() {
     if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
     const lbl = document.getElementById('sigCatLabel');
-    if(lbl) lbl.textContent = `현재 카테고리: ${_sigCat} (카테고리 합산 기준)`;
+    if(lbl) lbl.textContent = `현재 카테고리: ${_sigCat}`;
     renderSigTables(_sigCat);
 
     const W = _cWeights;
