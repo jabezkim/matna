@@ -259,7 +259,7 @@ self.addEventListener('fetch', e => {
     <div class="wrap">
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
-                <h1 class="hdr">맛나감자탕 POS 통합 분석 시스템 <span class="badge">V11.0 Final</span></h1>
+                <h1 class="hdr">맛나감자탕 POS 통합 분석 시스템 <span class="badge">V11.1 Final</span></h1>
                 <p class="hdr-sub">데이터 융합 분석 완료: 요일별·시간대별 메뉴 매출 흐름 크로스 분석</p>
             </div>
             <button class="btn sys" onclick="downloadSystem()"><i class="ti ti-device-floppy"></i> 시스템 저장</button>
@@ -943,7 +943,7 @@ function saveExcel(wb, filename) {
 }
 function downloadSystem() {
     const blob = new Blob([document.documentElement.outerHTML], {type: "text/html"});
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "맛나감자탕_분석시스템_V11.0.html"; a.click();
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "맛나감자탕_분석시스템_V11.1.html"; a.click();
 }
 
 // ==========================================
@@ -1478,7 +1478,7 @@ function renderCMonthly() {
     chartCMonthly=new Chart(document.getElementById('cvCMonthly').getContext('2d'),{type:'bar',data:{labels:months,datasets:tops.map((m,i)=>({label:m.name,data:months.map(mo=>Math.round(m.tn*W.monthW[mo])),backgroundColor:CC[i%CC.length]+'cc',borderRadius:2}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(0)+'만'}}}}});
 
     let th='<tr><th>월</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">월합계</th></tr>';
-    document.querySelector('#tblC_Monthly 대ead').innerHTML=th;
+    document.querySelector('#tblC_Monthly thead').innerHTML=th;
     document.querySelector('#tblC_Monthly tbody').innerHTML=months.map(mo=>{
         const vals=tops.map(m=>Math.round(m.tn*W.monthW[mo]));
         return`<tr><td style="font-weight:700;background:#f8fafc">${mo}</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(vals.reduce((s,v)=>s+v,0))}</td></tr>`;
@@ -1621,7 +1621,7 @@ function renderCSignal() {
         <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">① 변화율 활용 — 식재료 발주 최적화</span><div style="color:#cbd5e1;margin-top:4px">변화율 +20% 이상인 날짜·요일이 반복된다면 해당 카테고리 식재료를 <b>그 전날 15~25% 추가 발주</b>하세요. -20% 이하 날짜는 발주를 줄여 원가를 절감하세요.</div></div>
         <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">② 피크/비피크 요일 전략 분리</span><div style="color:#cbd5e1;margin-top:4px">피크 요일 <b style="color:#fbbf24">${peakDay}요일</b>은 인력 강화·강세 카테고리 준비, 비피크 요일 <b style="color:#f87171">${lowDay}요일</b>은 <b>타임세일·SNS 이벤트</b>로 매출 편차를 줄이세요.</div></div>
         <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">③ 배달 채널 이상 감지 활용</span><div style="color:#cbd5e1;margin-top:4px">배달 탭의 변화율이 높은 날짜는 날씨·이벤트 등 외부 요인과 연관될 수 있습니다. 패턴을 메모해 <b>배달 프로모션 타이밍</b>을 잡는 데 활용하세요.</div></div>
-        <div><span style="font-size:15px;font-weight:700;color:#93c5fd">④ 카테고리 교차 분석</span><div style="color:#cbd5e1;margin-top:4px">감자탕 강세 날에 뼈찜이 약세인 패턴 등을 비교하면 <b>카테고리 간 대체재 관계</b>를 파악할 수 있어 메뉴 구성 전략에 활용하세요.</div></div>`;
+        <div><span style="font-size:15px;font-weight:700;color:#93c5fd">④ 카테고리 교차 분석</span><div style="color:#cbd5e1;margin-top:4px">감자탕 강세 날에 뼈찜이 약세인 패턴 등을 비교하면 <b>카테고리 간 대체재 관계</b> 파악할 수 있어 메뉴 구성 전략에 활용하세요.</div></div>`;
 }
 
 function renderCStrategy() {
@@ -1678,7 +1678,7 @@ function copyForAIC() {
         signal: '판매 이상 감지', strategy: '경영전략'
     };
     const currentTabName = tabNames[curCTab] || curCTab;
-    let report = `[맛나감자탕 ${store} 경영 분석 리포트 - 현재 탭: ${currentTabName}]\n\n`;
+    let report = `[맛나감자탕 ${store} 경영 분석 리포트 - 현재 탭: ${currentTabName}]\\n\\n`;
 
     // 1. 현재 탭에 따라 추출할 테이블 ID 및 필터 정보 설정
     let tableIds = [];
@@ -1693,43 +1693,43 @@ function copyForAIC() {
         // 사용자가 선택한 카테고리와 메뉴 필터 정보 추가
         const catSel = document.getElementById(curCTab + 'Cat');
         if (catSel) {
-            filterText = `■ 분석 기준: ${catSel.options[catSel.selectedIndex].text}\n`;
+            filterText = `■ 분석 기준: ${catSel.options[catSel.selectedIndex].text}\\n`;
             if (['감자탕', '뼈찜', '간장뼈찜', '뼈구이'].includes(catSel.value)) {
                 const checked = Array.from(document.querySelectorAll(`#${curCTab}MenuCheckboxes input:checked`)).map(cb => cb.value);
-                filterText += `■ 선택된 세부 메뉴: ${checked.join(', ')}\n`;
+                filterText += `■ 선택된 세부 메뉴: ${checked.join(', ')}\\n`;
             }
-            filterText += '\n';
+            filterText += '\\n';
         }
     } else if (curCTab === 'catrank') {
         tableIds = ['tblCat_감자탕', 'tblCat_뼈찜', 'tblCat_뼈구이', 'tblCat_간장뼈찜', 'tblCat_식사'];
     } else if (curCTab === 'signal') {
         tableIds = ['tblSigDaily', 'tblSigWeekday', 'tblSigMonth'];
-        filterText = `■ 분석 카테고리: ${_sigCat}\n\n`;
+        filterText = `■ 분석 카테고리: ${_sigCat}\\n\\n`;
     } else if (curCTab === 'strategy') {
         tableIds = ['tblABC'];
     }
 
     report += filterText;
 
-    // 2. 설정된 테이블 ID를 순회하며 화면에 보이는 텍스트 추출
+    // 2. 설정된 테이블 ID를 순회하며 화면에 보이는 텍스트 추출 (.textContent 사용)
     let hasData = false;
     tableIds.forEach(tId => {
         const table = document.getElementById(tId);
         if (table) {
             // 테이블 위에 있는 패널 제목 추출
             const titleEl = table.closest('.panel')?.querySelector('.panel-t');
-            if (titleEl) report += `[${titleEl.innerText.trim()}]\n`;
+            if (titleEl) report += `[${titleEl.textContent.trim()}]\\n`;
             
             // 헤더(th) 추출
-            const ths = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim()).join('\t');
+            const ths = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim()).join('\\t');
             if (ths) {
-                report += ths + '\n';
+                report += ths + '\\n';
                 // 본문(td) 추출 (토큰 제한 방지를 위해 최대 30행 제한)
                 const trs = Array.from(table.querySelectorAll('tbody tr')).slice(0, 30);
                 trs.forEach(tr => {
-                    report += Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()).join('\t') + '\n';
+                    report += Array.from(tr.querySelectorAll('td')).map(td => td.textContent.trim()).join('\\t') + '\\n';
                 });
-                report += '\n';
+                report += '\\n';
                 hasData = true;
             }
         }
@@ -1741,17 +1741,16 @@ function copyForAIC() {
         const peakDay = DAY_ORDER.filter(d => W.dayAgg[d] > 0).sort((a,b) => W.dayAgg[b] - W.dayAgg[a])[0] || '-'; 
         const peakSeg = SEGS.map(s => ({...s, sales: s.hours.reduce((sum,h) => sum + (W.hourAgg[h] || 0), 0)})).sort((a,b) => b.sales - a.sales)[0];
         
-        report += `■ 기간 총매출: ${fmt(_cTotalA)}원 | 분석 메뉴: ${parsedB.length}종\n`;
-        report += `■ 피크 요일: ${peakDay}요일 | 피크 시간대: ${peakSeg?.name || '-'}\n\n`; 
-        report += `■ 베스트 메뉴 TOP 10\n` + _cSortedB.slice(0,10).map((m,i) => `${i+1}위: ${m.name} (${fmt(m.tn)}원, ${((m.tn/totalB)*100).toFixed(1)}%)`).join('\n');
+        report += `■ 기간 총매출: ${fmt(_cTotalA)}원 | 분석 메뉴: ${parsedB.length}종\\n`;
+        report += `■ 피크 요일: ${peakDay}요일 | 피크 시간대: ${peakSeg?.name || '-'}\\n\\n`; 
+        report += `■ 베스트 메뉴 TOP 10\\n` + _cSortedB.slice(0,10).map((m,i) => `${i+1}위: ${m.name} (${fmt(m.tn)}원, ${((m.tn/totalB)*100).toFixed(1)}%)`).join('\\n');
     }
 
-    report += `\n위 데이터를 바탕으로 현재 상황을 진단하고, 우리 매장의 매출 극대화를 위한 맞춤형 마케팅 및 운영 전략을 구체적으로 제안해줘.`;
+    report += `\\n위 데이터를 바탕으로 현재 상황을 진단하고, 우리 매장의 매출 극대화를 위한 맞춤형 마케팅 및 운영 전략을 구체적으로 제안해줘.`;
     
     // 4. 클립보드 복사 실행
     copyToClipboard(report, 'AI 경영 상담 데이터 복사 완료!\\n현재 화면에 선택하신 데이터가 복사되었습니다.\\nClaude나 ChatGPT에 붙여넣어 활용하세요.');
 }
-
 </script>
 </body>
 </html>
