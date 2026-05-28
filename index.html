@@ -300,10 +300,10 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upA">
-                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;">
+                <div id="dzA" style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;transition:all .15s;">
                     <i class="ti ti-file-spreadsheet" style="font-size:36px;color:#4f46e5;display:block;margin-bottom:10px;"></i>
                     <p style="margin-bottom:6px;font-size:14px;"><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
-                    <small style="color:#9ca3af;font-size:12px;">포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
+                    <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
                         <input type="file" id="fiA" multiple
                             style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
@@ -404,10 +404,10 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upB">
-                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;">
+                <div id="dzB" style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;transition:all .15s;">
                     <i class="ti ti-receipt-refund" style="font-size:36px;color:#4f46e5;display:block;margin-bottom:10px;"></i>
                     <p style="margin-bottom:6px;font-size:14px;"><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
-                    <small style="color:#9ca3af;font-size:12px;">상품별 양식 (.xlsx, .xls, .csv)</small>
+                    <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
                         <input type="file" id="fiB" multiple
                             style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
@@ -870,19 +870,27 @@ function readFileAsync(file) {
 }
 
 function setupDrop(dzId, fiId, cb){
-  const dz = document.getElementById(dzId);
-  const fi = document.getElementById(fiId);
-  // PC: 드래그&드롭 지원
-  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.style.borderColor='#4f46e5'; });
-  dz.addEventListener('dragleave', ()=>{ dz.style.borderColor=''; });
-  dz.addEventListener('drop', e=>{
-      e.preventDefault(); dz.style.borderColor='';
-      if(e.dataTransfer.files.length) cb(Array.from(e.dataTransfer.files));
-  });
-  // 모바일/PC 공통: label→input 연결로 파일 선택
-  fi.addEventListener('change', e=>{
-      if(e.target.files.length) cb(Array.from(e.target.files));
-  });
+    const dz = document.getElementById(dzId);
+    const fi = document.getElementById(fiId);
+    if(!dz || !fi) return;
+
+    // PC 드래그&드롭
+    dz.addEventListener('dragenter', e=>{ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='#4f46e5'; dz.style.background='#f5f3ff'; });
+    dz.addEventListener('dragover',  e=>{ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='#4f46e5'; dz.style.background='#f5f3ff'; });
+    dz.addEventListener('dragleave', e=>{ e.preventDefault(); e.stopPropagation();
+        if(!dz.contains(e.relatedTarget)){ dz.style.borderColor=''; dz.style.background=''; }
+    });
+    dz.addEventListener('drop', e=>{
+        e.preventDefault(); e.stopPropagation();
+        dz.style.borderColor=''; dz.style.background='';
+        const files = Array.from(e.dataTransfer.files);
+        if(files.length) cb(files);
+    });
+
+    // 파일 선택 change
+    fi.addEventListener('change', e=>{
+        if(e.target.files.length) cb(Array.from(e.target.files));
+    });
 }
 
 function saveExcel(wb, filename) {
