@@ -1,2 +1,2298 @@
-# Auto detect text files and perform LF normalization
+# <!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>맛나감자탕 매출 분석</title>
+
+    <!-- PWA 설정 -->
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="맛나감자탕">
+    <meta name="application-name" content="맛나감자탕">
+    <meta name="description" content="맛나감자탕 POS 통합 매출 분석 시스템">
+
+    <!-- 홈화면 아이콘 (SVG 인라인 → base64 변환) -->
+    <link rel="manifest" id="pwaManifest">
+    <link rel="apple-touch-icon" id="appleIcon">
+
+    <script>
+    // ── PWA 매니페스트 + 아이콘 동적 생성 ──
+    (function() {
+        // SVG 아이콘 생성 (🦴 맛나감자탕 로고)
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+            <rect width="512" height="512" rx="100" fill="#4f46e5"/>
+            <text x="256" y="200" font-size="160" text-anchor="middle" dominant-baseline="middle" fill="white">🦴</text>
+            <text x="256" y="340" font-size="64" text-anchor="middle" font-family="-apple-system,sans-serif" font-weight="700" fill="white">맛나</text>
+            <text x="256" y="420" font-size="52" text-anchor="middle" font-family="-apple-system,sans-serif" font-weight="600" fill="#c7d2fe">감자탕</text>
+        </svg>`;
+        const svgBlob = new Blob([svg], {type:'image/svg+xml'});
+        const svgUrl  = URL.createObjectURL(svgBlob);
+
+        // Apple Touch Icon
+        const appleLink = document.getElementById('appleIcon');
+        appleLink.href = svgUrl;
+
+        // Web App Manifest
+        const manifest = {
+            name: '맛나감자탕 매출 분석',
+            short_name: '맛나감자탕',
+            description: 'POS 통합 매출 분석 시스템',
+            start_url: '.',
+            display: 'standalone',
+            background_color: '#f3f4f6',
+            theme_color: '#4f46e5',
+            orientation: 'portrait-primary',
+            icons: [
+                { src: svgUrl, sizes: '192x192', type: 'image/svg+xml', purpose: 'any maskable' },
+                { src: svgUrl, sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' }
+            ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+        document.getElementById('pwaManifest').href = URL.createObjectURL(manifestBlob);
+
+        // Service Worker 등록 (오프라인 캐시)
+        if('serviceWorker' in navigator) {
+            const swCode = `
+const CACHE = 'matna-v1';
+const ASSETS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js',
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css'
+];
+self.addEventListener('install', e => {
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(()=>{})));
+    self.skipWaiting();
+});
+self.addEventListener('activate', e => {
+    e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+    self.clients.claim();
+});
+self.addEventListener('fetch', e => {
+    e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(()=>new Response('오프라인 상태입니다'))));
+});`;
+            const swBlob = new Blob([swCode], {type:'application/javascript'});
+            navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+        }
+    })();
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+    
+    <style>
+        :root {
+            --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            --color-text-primary: #1f2937;
+            --color-text-secondary: #4b5563;
+            --color-text-tertiary: #9ca3af;
+            --color-background-primary: #ffffff;
+            --color-background-secondary: #f9fafb;
+            --color-border-secondary: #e5e7eb;
+            --border-radius-md: 6px;
+            --border-radius-lg: 12px;
+            --primary-accent: #4f46e5;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { background-color: #f3f4f6; font-family: var(--font-sans); color: var(--color-text-primary); padding-bottom: 80px; }
+
+        /* ── 컨테이너 ── */
+        .container { max-width: 1200px; width: 100%; background: var(--color-background-primary); padding: 1rem; margin: 0 auto; }
+        @media(min-width:768px) { body { padding: 1.5rem 1rem 2rem; } .container { padding: 2rem; border-radius: var(--border-radius-lg); box-shadow: 0 4px 10px -1px rgba(0,0,0,0.08); } }
+
+        .wrap { padding: 0.5rem 0; }
+        .hdr { font-size: 18px; font-weight: 700; margin-bottom: 4px; color: #111827; display: flex; align-items: center; justify-content: space-between; }
+        @media(min-width:768px){ .hdr { font-size: 24px; } }
+        .hdr-sub { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 1rem; }
+        .badge { background: #eff6ff; color: #1e40af; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; border: 1px solid #bfdbfe; }
+        .date-badge { display: inline-block; padding: 5px 12px; background: #e0e7ff; color: #4338ca; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 1rem; }
+        .holiday-note { background: #fee2e2; border: 1px solid #fecaca; border-radius: var(--border-radius-md); padding: 10px 14px; font-size: 13px; color: #991b1b; margin-bottom: 1rem; line-height: 1.6; }
+
+        /* ── 모드 탭 (상단 네비) ── */
+        .mode-row { display: flex; gap: 4px; margin-bottom: 1rem; background: #e2e8f0; padding: 4px; border-radius: var(--border-radius-lg); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .mode-row::-webkit-scrollbar { display: none; }
+        .mode-btn { flex: 1; min-width: 90px; padding: 10px 8px; border: none; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: transparent; color: #475569; transition: all .15s; display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+        .mode-btn.on { background: var(--color-background-primary); color: var(--primary-accent); box-shadow: 0 2px 4px rgba(0,0,0,0.06); }
+        @media(min-width:768px) { .mode-btn { font-size: 15px; padding: 12px 18px; min-width: 200px; gap: 8px; } }
+
+        /* ── 탭 버튼 ── */
+        .tab-row { display: flex; gap: 5px; margin-bottom: 1rem; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 4px; }
+        .tab-row::-webkit-scrollbar { display: none; }
+        .tab { padding: 8px 12px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 12px; font-weight: 600; cursor: pointer; background: var(--color-background-primary); color: var(--color-text-secondary); transition: all .12s; display: flex; align-items: center; gap: 4px; white-space: nowrap; flex-shrink: 0; -webkit-user-select: none; user-select: none; }
+        .tab.on { background: var(--primary-accent); color: white; border-color: var(--primary-accent); }
+        @media(min-width:768px) { .tab { padding: 8px 15px; font-size: 13px; gap: 6px; } }
+
+        /* ── 안내/드롭존 ── */
+        .info { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--border-radius-md); padding: 12px 14px; font-size: 13px; color: #166534; margin-bottom: 1rem; line-height: 1.6; }
+        .warning-info { background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--border-radius-md); padding: 12px 14px; font-size: 13px; color: #92400e; margin-bottom: 1rem; line-height: 1.6; text-align: center; }
+        .drop { border: 2px dashed #cbd5e1; border-radius: var(--border-radius-lg); padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; background: var(--color-background-secondary); transition: all .15s; margin-bottom: 1rem; }
+        .drop:hover, .drop:active { border-color: var(--primary-accent); background: #f5f3ff; }
+        .drop i { font-size: 36px; color: var(--primary-accent); display: block; margin-bottom: 10px; }
+        .drop p { font-size: 14px; }
+        .drop small { font-size: 12px; color: var(--color-text-tertiary); }
+
+        /* ── KPI 카드 ── */
+        .metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 1rem; }
+        @media(min-width:480px) { .metrics { grid-template-columns: repeat(3, 1fr); } }
+        @media(min-width:768px) { .metrics { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 1.5rem; } }
+        .mc { background: var(--color-background-secondary); border: 1px solid #e5e7eb; border-radius: var(--border-radius-md); padding: 10px 12px; border-left: 4px solid var(--primary-accent); }
+        .mc-l { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; font-weight: 600; line-height: 1.3; }
+        .mc-v { font-size: 15px; font-weight: 700; color: #111827; word-break: break-all; }
+        @media(min-width:768px) { .mc { padding: 14px 18px; } .mc-l { font-size: 13px; margin-bottom: 6px; } .mc-v { font-size: 20px; } }
+
+        /* ── 레이아웃 ── */
+        .two-col { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 1rem; }
+        .three-col { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 1rem; }
+        @media(min-width:768px) { .two-col { grid-template-columns: 1.2fr 0.8fr; gap: 16px; margin-bottom: 1.5rem; } .three-col { grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 1.5rem; } }
+
+        .panel { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
+        @media(min-width:768px) { .panel { padding: 1.25rem; margin-bottom: 1.25rem; } }
+        .panel-t { font-size: 13px; font-weight: 700; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px; }
+        canvas { max-height: 240px; width: 100%; }
+        @media(min-width:768px) { canvas { max-height: 280px; } }
+
+        /* ── 테이블 ── */
+        .seg-grid { display: flex; flex-direction: column; gap: 8px; }
+        .seg { border-radius: var(--border-radius-md); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
+        .tbl-wrap { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+        @media(min-width:768px) { table { font-size: 13px; min-width: 650px; } }
+        th { background: #f8fafc; padding: 10px 12px; text-align: left; font-weight: 700; border-bottom: 2px solid var(--color-border-secondary); cursor: pointer; white-space: nowrap; }
+        td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; white-space: nowrap; }
+        .num { text-align: right !important; }
+        .pct-box { display: inline-block; padding: 2px 5px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .pct-cat { background: #dbeafe; color: #1e40af; }
+        .pct-total { background: #fef3c7; color: #92400e; margin-left: 2px; }
+
+        /* ── 버튼 ── */
+        .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 1rem; }
+        .btn { padding: 12px 16px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 13px; font-weight: 600; cursor: pointer; background: var(--color-background-primary); display: flex; align-items: center; gap: 6px; flex: 1; justify-content: center; min-height: 44px; }
+        .btn:active { opacity: 0.8; }
+        .btn.p { background: #2563eb; color: #fff; border-color: #2563eb; }
+        .btn.ai { background: #8b5cf6; color: #fff; border-color: #8b5cf6; }
+        .btn.sys { background: #10b981; color: #fff; border-color: #10b981; }
+
+        /* ── 셀렉트/폼 ── */
+        .sel-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 10px 12px; border-radius: var(--border-radius-md); border: 1px solid #f3f4f6; }
+        .sel-row label { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
+        select { font-size: 13px; padding: 8px 10px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); outline: none; min-height: 40px; background: #fff; }
+        input[type="text"], input[type="password"], input[type="number"] { min-height: 44px; font-size: 16px !important; /* iOS 줌 방지 */ }
+        .hidden { display: none !important; }
+
+        /* ── 툴팁 (모바일: 탭하면 표시) ── */
+        .tip { position: relative; cursor: pointer; }
+        .tip::after { content: attr(data-tip); position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); background: #1e293b; color: #f1f5f9; font-size: 12px; line-height: 1.6; padding: 8px 12px; border-radius: 7px; white-space: pre-wrap; max-width: min(280px, 90vw); min-width: 160px; z-index: 999; opacity: 0; pointer-events: none; transition: opacity .15s; text-align: left; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+        .tip.tip-show::after, .tip:hover::after { opacity: 1; }
+        .tip::before { content: ''; position: absolute; bottom: calc(100% + 2px); left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #1e293b; z-index: 999; opacity: 0; pointer-events: none; transition: opacity .15s; }
+        .tip.tip-show::before, .tip:hover::before { opacity: 1; }
+
+        /* ── 검색바 ── */
+        .search-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; }
+        .search-bar input { flex: 1; border: none; background: transparent; font-size: 15px; outline: none; color: #1e293b; min-height: 28px; }
+
+        /* ── 잠금화면 ── */
+        #lockScreen input { font-size: 18px !important; }
+
+        /* ── 하단 고정 네비 (모바일) ── */
+        @media(max-width:767px) {
+            .bottom-nav { display: flex; }
+            .container { padding-bottom: 1rem; }
+        }
+        @media(min-width:768px) {
+            .bottom-nav { display: none; }
+        }
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid #e5e7eb; z-index: 100; padding: 0; box-shadow: 0 -2px 10px rgba(0,0,0,0.08); }
+        .bottom-nav button { flex: 1; padding: 10px 4px 8px; border: none; background: transparent; font-size: 10px; font-weight: 600; color: #94a3b8; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: color .12s; }
+        .bottom-nav button i { font-size: 20px; }
+        .bottom-nav button.on { color: var(--primary-accent); }
+    </style>
+</head>
+<body>
+
+<!-- ── 비밀번호 잠금 화면 ── -->
+<div id="lockScreen" style="position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+    <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:48px;margin-bottom:12px;">🦴</div>
+        <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 6px;">맛나감자탕</h1>
+        <p style="color:#93c5fd;font-size:14px;margin:0;">POS 통합 분석 시스템</p>
+    </div>
+    <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:36px 40px;width:320px;text-align:center;backdrop-filter:blur(10px);">
+        <div style="color:#e2e8f0;font-size:15px;font-weight:600;margin-bottom:20px;"><i class="ti ti-lock"></i> 접근 비밀번호를 입력하세요</div>
+        <input type="password" id="pwInput" placeholder="비밀번호"
+            style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:12px;"
+            onkeydown="if(event.key==='Enter') checkPW()">
+        <button onclick="checkPW()"
+            style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+            <i class="ti ti-login"></i> 입장하기
+        </button>
+        <div id="pwError" style="color:#f87171;font-size:13px;min-height:20px;"></div>
+    </div>
+    <p style="color:#475569;font-size:12px;margin-top:24px;">© 맛나감자탕 내부 전용 시스템</p>
+</div>
+
+<!-- 홈화면 설치 안내 배너 -->
+<div id="installBanner" style="display:none;position:fixed;bottom:72px;left:12px;right:12px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:14px;padding:14px 16px;z-index:200;box-shadow:0 4px 20px rgba(79,70,229,0.4);animation:slideUp .3s ease;">
+    <style>@keyframes slideUp{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}</style>
+    <div style="display:flex;align-items:center;gap:12px;">
+        <div style="font-size:32px;">🦴</div>
+        <div style="flex:1;">
+            <div style="font-weight:700;font-size:14px;margin-bottom:2px;">홈 화면에 추가하기</div>
+            <div style="font-size:12px;opacity:.85;">앱처럼 바로 실행할 수 있어요</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+            <button onclick="installApp()" style="background:#fff;color:#4f46e5;border:none;border-radius:8px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;">설치</button>
+            <button onclick="document.getElementById('installBanner').style.display='none'" style="background:transparent;color:rgba(255,255,255,.7);border:none;font-size:12px;cursor:pointer;padding:0;">닫기</button>
+        </div>
+    </div>
+    <div id="installGuide" style="display:none;margin-top:10px;padding:10px;background:rgba(255,255,255,.15);border-radius:8px;font-size:12px;line-height:1.8;">
+        <b>📱 iPhone/iPad (Safari)</b><br>
+        하단 <b>공유 버튼(□↑)</b> → <b>"홈 화면에 추가"</b> 탭<br><br>
+        <b>🤖 Android (Chrome)</b><br>
+        우측 상단 <b>⋮ 메뉴</b> → <b>"앱 설치"</b> 또는 <b>"홈 화면에 추가"</b> 탭
+    </div>
+</div>
+
+<div class="container">
+    <div class="wrap">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+            <div>
+                <h1 class="hdr">맛나감자탕 POS 통합 분석 시스템 <span class="badge">V10.1 Final</span></h1>
+                <p class="hdr-sub">데이터 융합 분석 완료: 요일별·시간대별 메뉴 매출 흐름 크로스 분석</p>
+            </div>
+            <button class="btn sys" onclick="downloadSystem()"><i class="ti ti-device-floppy"></i> 시스템 저장</button>
+        </div>
+
+        <div class="mode-row">
+            <button class="mode-btn on" id="mA" onclick="switchMode('A')"><i class="ti ti-calendar-stats"></i> <span class="btn-label">매장/일자/시간</span></button>
+            <button class="mode-btn" id="mB" onclick="switchMode('B')"><i class="ti ti-tools-kitchen-2"></i> <span class="btn-label">메뉴/채널</span></button>
+            <button class="mode-btn" id="mC" onclick="switchMode('C')"><i class="ti ti-dashboard"></i> <span class="btn-label">단독매장 리포트</span></button>
+        </div>
+
+        <!-- 하단 고정 네비 (모바일) -->
+        <nav class="bottom-nav" id="bottomNav">
+            <button id="bnA" class="on" onclick="switchMode('A');updateBottomNav('A')">
+                <i class="ti ti-calendar-stats"></i>일자/시간
+            </button>
+            <button id="bnB" onclick="switchMode('B');updateBottomNav('B')">
+                <i class="ti ti-tools-kitchen-2"></i>메뉴/채널
+            </button>
+            <button id="bnC" onclick="switchMode('C');updateBottomNav('C')">
+                <i class="ti ti-dashboard"></i>단독리포트
+            </button>
+        </nav>
+
+        <div id="secA">
+            <div class="tab-row" id="tabsA">
+                <button class="tab on" data-t="date"><i class="ti ti-calendar-event"></i> 일자별 분석</button>
+                <button class="tab" data-t="month"><i class="ti ti-calendar-month"></i> 월별 분석</button>
+                <button class="tab" data-t="weekday"><i class="ti ti-calendar-week"></i> 요일별 분석 (평균)</button> 
+                <button class="tab" data-t="hour"><i class="ti ti-clock"></i> 시간대별 분석</button>
+                <button class="tab" data-t="store"><i class="ti ti-building-store"></i> 가맹점 랭킹</button>
+                <button class="tab" data-t="cross"><i class="ti ti-border-all"></i> 일자 × 시간대 히트맵</button>
+                <button class="tab" data-t="weekdayCross"><i class="ti ti-table"></i> 요일 평균 시간대 히트맵</button>
+            </div>
+            
+            <div id="upA">
+                <div class="drop" id="dzA">
+                    <i class="ti ti-file-spreadsheet"></i>
+                    <p><b>[일자별/시간대별]</b> 여러 개의 엑셀 파일을 한 번에 드래그하거나 선택하세요.</p>
+                    <small>지원양식: 포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
+                </div>
+                <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple>
+            </div>
+            
+            <div id="resA" class="hidden">
+                <div id="periodDisplayA" class="date-badge"></div>
+                
+                <div class="sel-row">
+                    <label for="storeSel"><i class="ti ti-building-store"></i> 매장 선택 (비교용)</label>
+                    <select id="storeSel"><option value="ALL">전체 매장 (평균 보기)</option></select>
+                    
+                    <label style="margin-left:12px;" for="metSel"><i class="ti ti-eye"></i> 관측 지표</label>
+                    <select id="metSel">
+                        <option value="amt">실매출액 (₩)</option>
+                        <option value="cnt">매출건수 (건)</option>
+                        <option value="cust">고객수 (명)</option>
+                    </select>
+                </div>
+                
+                <div class="metrics" id="metsA"></div>
+                <div id="weekdayDetail" class="holiday-note hidden"></div>
+                
+                <!-- 섹션A 검색바 -->
+                <div class="search-bar">
+                    <i class="ti ti-search" style="color:#64748b;font-size:18px;flex-shrink:0;"></i>
+                    <input type="text" id="storeSearchInput" placeholder="매장명 또는 날짜 검색 (예: 군산, 2025-03, 월요일…)"
+                        style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;"
+                        oninput="renderSearchA(this.value)">
+                    <button onclick="document.getElementById('storeSearchInput').value='';renderSearchA('');"
+                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
+                </div>
+                <div id="searchResultA" class="hidden">
+                    <div class="panel" style="margin-bottom:1.25rem;">
+                        <p class="panel-t" id="searchTitleA"><i class="ti ti-search"></i> 검색 결과</p>
+                        <div class="metrics" id="searchMetsA" style="margin-bottom:12px;"></div>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblSearchA"><thead></thead><tbody></tbody></table></div>
+                    </div>
+                </div>
+                
+                <div class="panel" id="compareChartPanel">
+                    <p class="panel-t" id="compareTitle"><i class="ti ti-chart-line"></i> 매장 매출 비교 추이</p>
+                    <canvas id="cvCompare"></canvas>
+                </div>
+
+                <div class="panel" id="mainChartPanel">
+                    <p class="panel-t" id="ctA"><i class="ti ti-chart-bar"></i> 데이터 트렌드 (총합)</p>
+                    <canvas id="cvA"></canvas>
+                </div>
+                
+                <div id="hourLayout"></div>
+                
+                <div class="tbl-wrap"><table id="tblA"><thead></thead><tbody></tbody></table></div>
+                
+                <div class="btns">
+                    <button class="btn p" id="expA"><i class="ti ti-download"></i> 데이터 내보내기</button>
+                    <button class="btn ai" onclick="copyForAIA()"><i class="ti ti-robot"></i> AI와 데이터 공유</button>
+                    <button class="btn" onclick="resetA()"><i class="ti ti-refresh"></i> 다른 파일 분석</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="secB" class="hidden">
+            <!-- ── 매출 집계 근거 안내 ── -->
+            <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe);border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin-bottom:1.25rem;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                    <i class="ti ti-info-circle" style="color:#0284c7;font-size:18px;"></i>
+                    <b style="color:#0c4a6e;font-size:14px">📊 매출 집계 방식 안내 — 이 숫자는 어떻게 계산되나요?</b>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;font-size:13px;line-height:1.7;">
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #0284c7;">
+                        <b style="color:#0284c7">실매출액 (기준)</b><br>
+                        <span style="color:#374151">총매출액 − 할인액 = 실매출액입니다. 모든 수치는 실매출액 기준입니다.</span>
+                    </div>
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #4f46e5;">
+                        <b style="color:#4f46e5">홀 매출</b><br>
+                        <span style="color:#374151">일반 홀 + 티오더(홀) 합산입니다. 배달·포장을 제외한 <b>매장 내 취식</b> 매출입니다.</span>
+                    </div>
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #ef4444;">
+                        <b style="color:#dc2626">배달 매출 (독립 측정)</b><br>
+                        <span style="color:#374151">배달앱 주문은 <b>독립적으로만 집계</b>됩니다. 배달로 주문된 감자탕은 감자탕 카테고리에 포함되지 않고 <b>배달 탭에서만</b> 확인할 수 있습니다.</span>
+                    </div>
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #10b981;">
+                        <b style="color:#059669">포장 매출 (카테고리 포함)</b><br>
+                        <span style="color:#374151">포장 주문은 <b>해당 메뉴 카테고리에 포함</b>됩니다. 감자탕 포장 주문 → 감자탕 카테고리 + 포장 탭 양쪽에 집계됩니다.</span>
+                    </div>
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #f59e0b;">
+                        <b style="color:#d97706">카테고리 매출 = 홀 + 포장</b><br>
+                        <span style="color:#374151">감자탕·뼈찜 등 카테고리 매출은 <b>홀 주문 + 포장 주문 합산</b>입니다. 배달은 제외됩니다.</span>
+                    </div>
+                    <div style="background:#fff;border-radius:8px;padding:12px;border-left:3px solid #8b5cf6;">
+                        <b style="color:#7c3aed">포장 탭의 의미</b><br>
+                        <span style="color:#374151">포장 채널로 주문된 모든 메뉴를 볼 수 있습니다. 어떤 메뉴가 포장으로 많이 나가는지 확인하는 용도입니다.</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="upB">
+                <div class="drop" id="dzB">
+                    <i class="ti ti-receipt-refund"></i>
+                    <p><b>[상품별 매출]</b> 1~4개 등 분할된 엑셀 파일을 한 번에 드래그하여 올리세요.</p>
+                    <small>지원양식: 상품별 양식 (.xlsx, .xls, .csv)</small>
+                </div>
+                <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple>
+            </div>
+            
+            <div id="resB" class="hidden">
+                <!-- 매장 선택 + 지표 -->
+                <div class="sel-row" id="storeBSelRow" style="display:none; flex-wrap:wrap; gap:8px; align-items:center;">
+                    <label><i class="ti ti-building-store"></i> 매장 선택</label>
+                    <select id="storeBSel" style="font-weight:bold;" onchange="renderB()"></select>
+                    <span id="storeBCount" style="font-size:12px;color:#64748b;"></span>
+                    <span style="font-size:11px;color:#9ca3af;">※ 매장명을 못 찾으면 파일 최상단 셀에 매장명이 있는지 확인하세요</span>
+                </div>
+                <!-- 섹션B 검색바 -->
+                <div class="search-bar">
+                    <i class="ti ti-search" style="color:#64748b;font-size:18px;flex-shrink:0;"></i>
+                    <input type="text" id="menuSearchInput" placeholder="메뉴 키워드 검색 (예: 목뼈감자탕, 뼈찜, 볶음밥…)"
+                        style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;"
+                        oninput="renderMenuSearch(this.value)">
+                    <button onclick="document.getElementById('menuSearchInput').value='';renderMenuSearch('');"
+                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
+                </div>
+                <div id="menuSearchResult" class="hidden">
+                    <div class="panel" style="margin-bottom:1.25rem;">
+                        <p class="panel-t" id="menuSearchTitle"><i class="ti ti-search"></i> 검색 결과</p>
+                        <div class="metrics" id="menuSearchMets" style="margin-bottom:12px;"></div>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblSearch"><thead></thead><tbody></tbody></table></div>
+                    </div>
+                </div>
+                <div class="metrics" id="metsB"></div>
+                <!-- 카테고리별 요약 -->
+                <div class="panel" style="margin-bottom:1.25rem;padding:0;overflow:hidden;">
+                    <p class="panel-t" style="padding:14px 18px;margin-bottom:0;border-bottom:1px solid #f1f5f9;">
+                        <i class="ti ti-chart-donut"></i> 카테고리별 매출 · 비율 · 메뉴 수
+                        <span style="font-size:12px;color:#94a3b8;margin-left:8px">클릭하면 해당 카테고리로 필터링</span>
+                    </p>
+                    <div id="catSummaryB"></div>
+                </div>
+                <!-- 카테고리 필터 탭 -->
+                <div class="tab-row" id="tabsFilterB" style="margin-bottom:0; border-bottom:1px solid var(--color-border-secondary); padding-bottom:10px;"></div>
+                <div class="tbl-wrap" style="border-top-left-radius:0; border-top-right-radius:0; border-top:none;">
+                    <table id="tblB"><thead></thead><tbody></tbody></table>
+                    <div id="summaryBarB" style="background:#1e293b; color:white; padding:14px 18px; font-size:13px; display:flex; justify-content:space-between; align-items:center;"></div>
+                </div>
+                <!-- 매장 비교 차트 (매장이 2개 이상일 때만) -->
+                <div id="storeBComparePanel" class="panel" style="display:none; margin-top:1.25rem;">
+                    <p class="panel-t"><i class="ti ti-chart-bar"></i> 매장별 매출 비교</p>
+                    <canvas id="cvBStoreCompare" style="height:260px;"></canvas>
+                </div>
+                <div class="btns">
+                    <button class="btn p" onclick="downloadExcelB()"><i class="ti ti-download"></i> 엑셀 내보내기</button>
+                    <button class="btn ai" onclick="copyForAIB()"><i class="ti ti-robot"></i> AI와 데이터 공유</button>
+                    <button class="btn" onclick="resetB()"><i class="ti ti-refresh"></i> 다른 파일 분석</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="secC" class="hidden">
+            <div id="promptC" class="warning-info">
+                <i class="ti ti-alert-triangle" style="font-size:24px; display:block; margin-bottom:10px; color:#d97706;"></i>
+                <b>단독 매장 종합 리포트를 보시려면 두 가지 데이터가 모두 필요합니다.</b><br><br>
+                (1) 매장/일자/시간 분석 탭에 파일을 업로드하세요.<br>
+                (2) 정밀 메뉴/채널 분석 탭에 파일을 업로드하세요.
+            </div>
+
+            <div id="resC" class="hidden">
+                <!-- 헤더 -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:8px;">
+                    <div id="periodDisplayC" class="date-badge" style="margin-bottom:0; font-size:15px;"><i class="ti ti-building-store"></i> 단독 매장 통합 대시보드</div>
+                    <div class="sel-row" style="margin-bottom:0; gap:16px; flex-wrap:wrap;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label for="storeSelC" style="font-size:13px;font-weight:700;white-space:nowrap;">📊 일자/시간 매장</label>
+                            <select id="storeSelC" style="font-weight:bold;"></select>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;" id="storeCBRow">
+                            <label for="storeSelCB" style="font-size:13px;font-weight:700;white-space:nowrap;">🍖 메뉴 매장</label>
+                            <select id="storeSelCB" style="font-weight:bold;" onchange="renderC()"></select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KPI -->
+                <div class="metrics" id="metsC"></div>
+
+                <!-- 내부 탭 -->
+                <div style="display:flex; gap:6px; flex-wrap:wrap; background:#f1f5f9; padding:6px; border-radius:10px; margin-bottom:1.25rem;" id="tabsC">
+                    <button class="tab on" onclick="switchCTab('overview',this)"><i class="ti ti-layout-dashboard"></i> 종합 개요</button>
+                    <button class="tab" onclick="switchCTab('monthly',this)"><i class="ti ti-calendar-month"></i> 월별 메뉴</button>
+                    <button class="tab" onclick="switchCTab('weekday',this)"><i class="ti ti-calendar-week"></i> 요일별 메뉴</button>
+                    <button class="tab" onclick="switchCTab('daily',this)"><i class="ti ti-calendar-event"></i> 일별 메뉴</button>
+                    <button class="tab" onclick="switchCTab('hourly',this)"><i class="ti ti-clock"></i> 시간별 메뉴</button>
+                    <button class="tab" onclick="switchCTab('catrank',this)"><i class="ti ti-category"></i> 카테고리별 TOP10</button>
+                    <button class="tab" onclick="switchCTab('signal',this)"><i class="ti ti-trending-up"></i> 판매 이상 감지</button>
+                    <button class="tab" onclick="switchCTab('strategy',this)"><i class="ti ti-bulb"></i> 경영전략</button>
+                </div>
+
+                <!-- 탭 패널들 -->
+                <div id="cpanel_overview">
+                    <div class="two-col">
+                        <div class="panel"><p class="panel-t"><i class="ti ti-chart-line"></i> 일자별 전체 매출 흐름</p><canvas id="cvCDaily" style="height:220px;"></canvas></div>
+                        <div class="panel"><p class="panel-t"><i class="ti ti-chart-pie"></i> 카테고리별 매출 비중</p><div style="height:220px;display:flex;justify-content:center;"><canvas id="cvCCategory"></canvas></div></div>
+                    </div>
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-trophy"></i> 종합 베스트 메뉴 TOP 10</p>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_Top"><thead></thead><tbody></tbody></table></div>
+                    </div>
+                    <div class="info" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-bottom:1.25rem;">
+                        <i class="ti ti-wand"></i> <b>가중치 기반 역산 모델</b> — 메뉴 데이터(B)를 일자별 데이터(A)의 매출 비중으로 역산한 추정치입니다.
+                    </div>
+                    <div class="two-col">
+                        <div class="panel"><p class="panel-t"><i class="ti ti-calendar-stats"></i> 요일별 인기 메뉴 (TOP 7)</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_Weekday"><thead></thead><tbody></tbody></table></div></div>
+                        <div class="panel"><p class="panel-t"><i class="ti ti-clock"></i> 시간대별 인기 메뉴 (TOP 7)</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_Hour"><thead></thead><tbody></tbody></table></div></div>
+                    </div>
+                </div>
+
+                <div id="cpanel_monthly" class="hidden">
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-chart-bar"></i> 월별 TOP 메뉴 매출 추이 (가중치 추정)</p>
+                        <div class="sel-row" style="margin-bottom:12px;"><label>표시 메뉴 수</label>
+                        <select id="monthlyN" onchange="renderCMonthly()"><option value="5">TOP 5</option><option value="7" selected>TOP 7</option><option value="10">TOP 10</option></select></div>
+                        <canvas id="cvCMonthly" style="height:300px;"></canvas>
+                    </div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-chart-area"></i> 월별 매출 총합 추이</p><canvas id="cvCMonthlyTotal" style="height:200px;"></canvas></div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-table"></i> 월별 × 메뉴 상세표</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_Monthly"><thead></thead><tbody></tbody></table></div></div>
+                </div>
+
+                <div id="cpanel_weekday" class="hidden">
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-chart-bar"></i> 요일별 TOP 메뉴 매출 (가중치 추정)</p>
+                        <div class="sel-row" style="margin-bottom:12px;"><label>표시 메뉴 수</label>
+                        <select id="weekdayN" onchange="renderCWeekday()"><option value="5">TOP 5</option><option value="7" selected>TOP 7</option><option value="10">TOP 10</option></select></div>
+                        <canvas id="cvCWeekdayMenu" style="height:300px;"></canvas>
+                    </div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-chart-bar"></i> 요일별 전체 매출 (실측)</p><canvas id="cvCWeekdayTotal" style="height:200px;"></canvas></div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-table"></i> 요일별 × 메뉴 상세표</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_WeekdayDetail"><thead></thead><tbody></tbody></table></div></div>
+                </div>
+
+                <div id="cpanel_daily" class="hidden">
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-chart-line"></i> 일별 TOP 메뉴 매출 추이 (가중치 추정)</p>
+                        <div class="sel-row" style="margin-bottom:12px;"><label>표시 메뉴 수</label>
+                        <select id="dailyN" onchange="renderCDailyMenu()"><option value="3">TOP 3</option><option value="5" selected>TOP 5</option><option value="7">TOP 7</option></select></div>
+                        <canvas id="cvCDailyMenu" style="height:300px;"></canvas>
+                    </div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-table"></i> 일별 × 메뉴 상세표 (최근 30일)</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_Daily"><thead></thead><tbody></tbody></table></div></div>
+                </div>
+
+                <div id="cpanel_hourly" class="hidden">
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-chart-bar"></i> 시간대별 TOP 메뉴 매출 (가중치 추정)</p>
+                        <div class="sel-row" style="margin-bottom:12px;"><label>표시 메뉴 수</label>
+                        <select id="hourlyN" onchange="renderCHourly()"><option value="5">TOP 5</option><option value="7" selected>TOP 7</option><option value="10">TOP 10</option></select></div>
+                        <canvas id="cvCHourlyMenu" style="height:300px;"></canvas>
+                    </div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-layout-grid"></i> 운영구간별 TOP 메뉴</p><div id="segMenuGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;"></div></div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-table"></i> 시간대별 × 메뉴 상세표</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblC_HourlyDetail"><thead></thead><tbody></tbody></table></div></div>
+                </div>
+
+                <div id="cpanel_catrank" class="hidden">
+                    <div class="info" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af;margin-bottom:1.25rem;">
+                        <i class="ti ti-info-circle"></i> 감자탕·뼈찜·뼈구이·간장뼈찜·식사류 각 카테고리 내 <b>실매출액 TOP 10</b> 순위입니다.
+                    </div>
+                    <div class="two-col">
+                        <div class="panel"><p class="panel-t"><i class="ti ti-bone"></i> 감자탕 TOP 10</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblCat_감자탕"><thead></thead><tbody></tbody></table></div></div>
+                        <div class="panel"><p class="panel-t"><i class="ti ti-flame"></i> 뼈찜 TOP 10</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblCat_뼈찜"><thead></thead><tbody></tbody></table></div></div>
+                    </div>
+                    <div class="two-col">
+                        <div class="panel"><p class="panel-t"><i class="ti ti-grill"></i> 뼈구이 TOP 10</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblCat_뼈구이"><thead></thead><tbody></tbody></table></div></div>
+                        <div class="panel"><p class="panel-t"><i class="ti ti-sauce"></i> 간장뼈찜 TOP 10</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblCat_간장뼈찜"><thead></thead><tbody></tbody></table></div></div>
+                    </div>
+                    <div class="panel"><p class="panel-t"><i class="ti ti-bowl"></i> 식사류 TOP 10</p><div class="tbl-wrap" style="margin-bottom:0;"><table id="tblCat_식사"><thead></thead><tbody></tbody></table></div></div>
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-chart-bar"></i> 카테고리별 매출 비교</p>
+                        <canvas id="cvCatCompare" style="height:260px;"></canvas>
+                    </div>
+                </div>
+
+                <div id="cpanel_signal" class="hidden">
+                    <div class="info" style="background:#fef3c7;border-color:#fde68a;color:#92400e;margin-bottom:1.25rem;">
+                        <i class="ti ti-sparkles"></i> <b>판매 이상 감지</b> — <b>카테고리 합산</b> 기준으로 변화량(Δ원)과 변화율(%)을 측정합니다. 소량 메뉴의 과민반응을 막기 위해 <b>카테고리 전체 합산 매출</b>이 기준이며, 변화율(%)과 변화량(Δ원)을 함께 표시합니다. 배달은 배달 채널 매출만 별도 집계합니다.
+                    </div>
+
+                    <!-- 카테고리 탭 공통 -->
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;background:#f1f5f9;padding:6px;border-radius:10px;margin-bottom:1.25rem;" id="sigCatTabs">
+                        <button class="tab on" onclick="switchSigCat('감자탕',this)">🦴 감자탕</button>
+                        <button class="tab" onclick="switchSigCat('뼈찜',this)">🔥 뼈찜</button>
+                        <button class="tab" onclick="switchSigCat('뼈구이',this)">🍖 뼈구이</button>
+                        <button class="tab" onclick="switchSigCat('간장뼈찜',this)">🫙 간장뼈찜</button>
+                        <button class="tab" onclick="switchSigCat('세트',this)">🎁 세트</button>
+                        <button class="tab" onclick="switchSigCat('배달',this)">🛵 배달</button>
+                    </div>
+                    <div id="sigCatLabel" style="font-size:13px;font-weight:700;color:#4f46e5;margin-bottom:12px;"></div>
+
+                    <!-- 일별 TOP 20 -->
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-calendar-event"></i> 일별 — 평균 대비 변화량·변화율 TOP 20</p>
+                        <div class="info" style="font-size:12px;margin-bottom:12px;padding:8px 12px;background:#f8fafc;border-color:#e5e7eb;color:#374151;">
+                            카테고리 합산 기준 · 각 날짜의 추정 매출 vs 일평균 · 변화율 내림차순
+                        </div>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblSigDaily"><thead></thead><tbody></tbody></table></div>
+                    </div>
+
+                    <!-- 요일별 TOP 20 -->
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-calendar-week"></i> 요일별 — 평균 대비 변화량·변화율</p>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblSigWeekday"><thead></thead><tbody></tbody></table></div>
+                    </div>
+
+                    <!-- 월별 TOP 20 -->
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-calendar-month"></i> 월별 — 평균 대비 변화량·변화율</p>
+                        <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblSigMonth"><thead></thead><tbody></tbody></table></div>
+                    </div>
+
+                    <!-- 운영 제언 -->
+                    <div class="panel" style="background:linear-gradient(135deg,#0f172a,#1e3a5f);border:none;color:#fff;">
+                        <p class="panel-t" style="color:#93c5fd;"><i class="ti ti-bulb"></i> 강세 신호 기반 운영 제언</p>
+                        <div id="signalAdvice" style="line-height:1.9;font-size:14px;"></div>
+                    </div>
+                </div>
+
+                <div id="cpanel_strategy" class="hidden">
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-award"></i> ABC 메뉴 분석 (파레토 법칙)</p>
+                        <div class="info" style="margin-bottom:12px;background:#f0fdf4;border-color:#bbf7d0;color:#166534;font-size:13px;">
+                            <b>A등급</b>(상위 20% 메뉴 → 매출 80%) : 핵심 주력 | <b>B등급</b>(차순위 30%) : 지원 보조 | <b>C등급</b>(하위 50%) : 개선·정리 검토
+                        </div>
+                        <div class="two-col">
+                            <div><canvas id="cvABC" style="height:260px;"></canvas></div>
+                            <div class="tbl-wrap" style="margin-bottom:0;"><table id="tblABC"><thead></thead><tbody></tbody></table></div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-target"></i> 시간대 기회 분석 — 피크 vs 비피크</p>
+                        <canvas id="cvOpportunity" style="height:220px;"></canvas>
+                        <div id="opportunityInsight" style="margin-top:12px;"></div>
+                    </div>
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-git-merge"></i> 채널별 전략 인사이트</p>
+                        <div class="three-col" id="channelInsight" style="margin-bottom:0;"></div>
+                    </div>
+                    <div class="panel" style="background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);color:#fff;border:none;">
+                        <p class="panel-t" style="color:#c7d2fe;"><i class="ti ti-sparkles"></i> 매장 맞춤형 경영전략 제언 (자동 도출)</p>
+                        <div id="strategyReport" style="line-height:1.9;font-size:14px;"></div>
+                    </div>
+                    <div class="panel">
+                        <p class="panel-t"><i class="ti ti-calculator"></i> 매출 목표 달성 시뮬레이터</p>
+                        <div class="sel-row" style="flex-wrap:wrap;gap:12px;">
+                            <label>목표 일매출 (만원)</label>
+                            <input type="number" id="targetSales" style="width:120px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" placeholder="예: 150" oninput="runSimulator()">
+                        </div>
+                        <div id="simulatorResult" style="margin-top:14px;"></div>
+                    </div>
+                </div>
+
+                <!-- 하단 버튼 -->
+                <div class="btns" style="justify-content:center; margin-top:2rem;">
+                    <button class="btn p" style="padding:14px 24px;font-size:15px;" onclick="downloadExcelC()"><i class="ti ti-file-spreadsheet"></i> 통합 엑셀 다운로드</button>
+                    <button class="btn ai" style="padding:14px 24px;font-size:15px;" onclick="copyForAIC()"><i class="ti ti-robot"></i> AI 경영 상담 데이터 복사</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// ==========================================
+// 공통 글로벌 설정
+// ==========================================
+// ── PWA 설치 ──
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // 잠금 해제 후 3초 뒤 배너 표시
+    setTimeout(() => {
+        if(document.getElementById('lockScreen').style.display === 'none') showInstallBanner();
+    }, 3000);
+});
+
+function showInstallBanner() {
+    const banner = document.getElementById('installBanner');
+    if(banner) banner.style.display = 'block';
+}
+
+function installApp() {
+    if(deferredPrompt) {
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(() => {
+            deferredPrompt = null;
+            document.getElementById('installBanner').style.display = 'none';
+        });
+    } else {
+        // iOS Safari는 beforeinstallprompt 미지원 → 수동 안내
+        const guide = document.getElementById('installGuide');
+        if(guide) guide.style.display = guide.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+window.addEventListener('appinstalled', () => {
+    document.getElementById('installBanner').style.display = 'none';
+});
+
+// ── 모바일 지원 ──
+function updateBottomNav(mode) {
+    ['A','B','C'].forEach(m => {
+        const el = document.getElementById('bn'+m);
+        if(el) el.classList.toggle('on', m === mode);
+    });
+}
+
+// 툴팁 터치 지원 (모바일)
+document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('touchstart', e => {
+        const tip = e.target.closest('.tip');
+        if(tip) {
+            e.preventDefault();
+            document.querySelectorAll('.tip.tip-show').forEach(t => { if(t!==tip) t.classList.remove('tip-show'); });
+            tip.classList.toggle('tip-show');
+        } else {
+            document.querySelectorAll('.tip.tip-show').forEach(t => t.classList.remove('tip-show'));
+        }
+    }, { passive: false });
+
+    // switchMode 호출 시 하단 네비도 업데이트
+    const origSwitch = window.switchMode;
+    window.switchMode = function(m) {
+        origSwitch(m);
+        updateBottomNav(m);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+});
+
+// ── 비밀번호 잠금 ──
+const CORRECT_PW = 'matna2025'; // ← 비밀번호 변경 시 이 값만 수정하세요
+
+function checkPW() {
+    const input = document.getElementById('pwInput').value;
+    const errEl = document.getElementById('pwError');
+    if(input === CORRECT_PW) {
+        const lock = document.getElementById('lockScreen');
+        lock.style.transition = 'opacity .4s';
+        lock.style.opacity = '0';
+        setTimeout(()=>{ lock.style.display='none'; if(deferredPrompt) showInstallBanner(); }, 400);
+        errEl.textContent = '';
+    } else {
+        errEl.textContent = '⚠ 비밀번호가 올바르지 않습니다.';
+        const input = document.getElementById('pwInput');
+        input.style.borderColor = '#f87171';
+        input.value = '';
+        setTimeout(()=>{ input.style.borderColor='rgba(255,255,255,0.2)'; }, 1500);
+    }
+}
+
+// 페이지 로드 시 비밀번호 입력창에 포커스
+window.addEventListener('DOMContentLoaded', ()=>{
+    document.getElementById('pwInput').focus();
+});
+
+const HOURS = Array.from({length:24}, (_,i)=>i);
+const DAY_ORDER = ['일','월','화','수','목','금','토'];
+const PAL = ['#7F77DD','#1D9E75','#D85A30','#378ADD','#BA7517','#D4537E','#639922','#888780','#5DCAA5','#AFA9EC','#EF9F27','#85B7EB','#97C459','#F09595'];
+const CAT_COLORS = { '감자탕':'#ef4444', '뼈찜':'#f97316', '간장뼈찜':'#84cc16', '뼈구이':'#06b6d4', '세트':'#8b5cf6', '식사':'#3b82f6', '사리':'#f43f5e', '음료':'#64748b', '기타':'#cbd5e1' };
+const SEGS = [
+  {key:'morning', name:'아침 시간대', range:'06시 ~ 09시', hours:[6,7,8],        color:'#EF9F27'},
+  {key:'lunch',   name:'점심 피크',   range:'10시 ~ 14시', hours:[10,11,12,13],  color:'#1D9E75'},
+  {key:'extra',   name:'브레이크/오후',range:'15시 ~ 16시',hours:[15,16],       color:'#5DCAA5'},
+  {key:'dinner',  name:'저녁 만찬피크', range:'17시 ~ 22시', hours:[17,18,19,20,21],color:'#7F77DD'},
+  {key:'night',   name:'심야 운영구간', range:'22시 ~ 익일05시', hours:[22,23,0,1,2,3,4,5], color:'#888780'},
+];
+
+function getSegKey(h) { for(const s of SEGS) if(s.hours.includes(h)) return s.key; return null; }
+function pn(v) { return parseFloat(String(v||0).replace(/[^0-9.-]/g,''))||0; }
+function won(v) { return '₩'+Math.round(v).toLocaleString(); }
+function fmt(n) { return Math.round(n).toLocaleString(); }
+function cleanStr(str) { return String(str).replace(/[\s_]+/g, '').trim(); }
+
+function switchMode(m){
+  document.getElementById('mA').classList.toggle('on', m==='A');
+  document.getElementById('mB').classList.toggle('on', m==='B');
+  document.getElementById('mC').classList.toggle('on', m==='C');
+  
+  document.getElementById('mC').style.background = m==='C' ? 'var(--primary-accent)' : '#f8fafc';
+  document.getElementById('mC').style.color = m==='C' ? '#fff' : '#475569';
+
+  document.getElementById('secA').classList.toggle('hidden', m!=='A');
+  document.getElementById('secB').classList.toggle('hidden', m!=='B');
+  document.getElementById('secC').classList.toggle('hidden', m!=='C');
+
+  if(m === 'C') { checkAndRenderC(); }
+}
+
+function readFileAsync(file) {
+    return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = e => resolve(new Uint8Array(e.target.result));
+        r.onerror = e => reject(e);
+        r.readAsArrayBuffer(file);
+    });
+}
+
+function setupDrop(dzId, fiId, cb){
+  const dz = document.getElementById(dzId), fi = document.getElementById(fiId);
+  fi.style.display = 'none';
+  dz.addEventListener('click', ()=>fi.click());
+  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('over')});
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+  dz.addEventListener('drop', e=>{
+      e.preventDefault(); dz.classList.remove('over'); 
+      if(e.dataTransfer.files.length) cb(Array.from(e.dataTransfer.files));
+  });
+  fi.addEventListener('change', e=>{
+      if(e.target.files.length) cb(Array.from(e.target.files));
+  });
+}
+
+function downloadSystem() {
+    const blob = new Blob([document.documentElement.outerHTML], {type: "text/html"});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = "맛나감자탕_분석시스템_V10.1.html";
+    a.click();
+}
+
+// ==========================================
+// SECTION A
+// ==========================================
+let parsedA = null, chartA = null, chartCompare = null;
+let curTabA = 'date';
+setupDrop('dzA', 'fiA', loadA);
+
+document.querySelectorAll('#tabsA .tab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('#tabsA .tab').forEach(x=>x.classList.remove('on'));
+  t.classList.add('on'); curTabA=t.dataset.t;
+  if(parsedA) renderA();
+}));
+['storeSel','metSel'].forEach(id=>document.getElementById(id).addEventListener('change',()=> {if(parsedA) renderA()}));
+
+async function loadA(files){
+  if(!files || files.length === 0) return;
+  document.getElementById('upA').classList.add('hidden');
+  let allRecords = [];
+  for (let file of files) {
+      const data = await readFileAsync(file);
+      const wb = XLSX.read(data, {type:'array'});
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+      const parsed = parseA(raw);
+      if (parsed && parsed.length > 0) allRecords = allRecords.concat(parsed);
+  }
+  if (allRecords.length === 0) { alert('유효한 일자/시간대 데이터가 없습니다.'); document.getElementById('upA').classList.remove('hidden'); return; }
+  
+  parsedA = allRecords;
+  const stores = [...new Set(parsedA.map(r=>r.store))].sort();
+  const sel = document.getElementById('storeSel');
+  sel.innerHTML = '<option value="ALL">전체 매장 통합 (비교 기준: 평균)</option>';
+  stores.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s.replace('맛나감자탕 ',''); sel.appendChild(o); });
+  
+  document.getElementById('resA').classList.remove('hidden'); renderA();
+}
+
+function parseA(raw){
+  let hdrRow = -1;
+  for(let i=0; i<Math.min(raw.length, 20); i++) { 
+    const c0 = String(raw[i][0]||'').replace(/\s+/g,''); const c1 = String(raw[i][1]||'').replace(/\s+/g,'');
+    if(c0 === '일자' && c1.includes('요일')) { hdrRow=i; break; }
+  }
+  if(hdrRow < 0) return null;
+  const hdr = raw[hdrRow];
+  
+  let storeCol = -1;
+  for(let c=1; c<=6; c++){
+      const hStr = String(hdr[c]||'').replace(/\s+/g,'');
+      if(hStr === '영업매장' || hStr.includes('매장명') || hStr.includes('가맹점')){ storeCol = c; break; }
+  }
+  if(storeCol === -1) { if (String(hdr[2]||'').replace(/\s+/g,'') === '영업매장코드') storeCol = 3; else storeCol = 2; }
+
+  const colMap = [];
+  for(let c = 0; c < hdr.length; c++){
+      const val = String(hdr[c]||'').replace(/\s+/g,'');
+      if(val === '합계' || val === '총합계' || val === '총계'){
+          if(!colMap.some(m => m.slot === '합계')) colMap.push({slot: '합계', col: c});
+      } else if (val.includes('시') && /\d/.test(val)) {
+          const m = val.match(/(\d+)시/);
+          if (m) { const hour = parseInt(m[1], 10); if(!colMap.some(x => x.slot === hour)) colMap.push({slot: hour, col: c}); }
+      }
+  }
+
+  const records = []; let lastDate = '', lastDay = '';
+  for(let r = hdrRow + 1; r < raw.length; r++){
+    const row = raw[r]; if(!row || row.length === 0) continue;
+    const checkCell = String(row[colMap[0]?.col] || '');
+    if (checkCell.includes('매출') || checkCell.includes('건수') || checkCell.includes('고객')) continue;
+    
+    let dateVal = String(row[0]||'').trim(), dayVal = String(row[1]||'').trim(), storeVal = String(row[storeCol]||'').trim(); 
+    if (/^4\d{4}$/.test(dateVal)) {
+        const d = new Date(Math.round((parseInt(dateVal) - 25569) * 86400000));
+        dateVal = `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+    }
+
+    if (dateVal === '합계' || storeVal === '합계') continue;
+    if (!dateVal && lastDate) { dateVal=lastDate; dayVal=lastDay; } else if (dateVal && !dateVal.startsWith('소계')) { lastDate=dateVal; lastDay=dayVal; }
+    if (dateVal.startsWith('소계') || storeVal.includes('소계') || storeVal.match(/^[0-9]+개$/) || !storeVal) continue; 
+    if (dateVal.startsWith('소계:')) dateVal = dateVal.replace('소계:','').trim();
+    if (dateVal.length >= 10 && dateVal.indexOf('-') === 4) dateVal = dateVal.substring(5); 
+
+    const rec = { date:dateVal, day:dayVal, store:storeVal, slots:{} }; let hasValidData = false;
+    colMap.forEach(({slot, col}) => { 
+        const amt = pn(row[col]), cnt = pn(row[col+1]), cust = pn(row[col+2]);
+        rec.slots[slot] = {amt, cnt, cust}; if(amt > 0 || cnt > 0) hasValidData = true; 
+    });
+    if (hasValidData) records.push(rec);
+  }
+  return records;
+}
+
+function fmtA(v,m){ return m==='amt' ? won(v) : Math.round(v).toLocaleString(); }
+function metLabelA(){ return {amt:'실매출액', cnt:'매출건수', cust:'고객수'}[document.getElementById('metSel').value]; }
+
+function renderA(){
+  const m = document.getElementById('metSel').value, storeName = document.getElementById('storeSel').value;
+  const data = storeName === 'ALL' ? parsedA : parsedA.filter(r => r.store === storeName);
+  if (parsedA && parsedA.length > 0) {
+      const dates = [...new Set(parsedA.map(r => r.date))].sort();
+      document.getElementById('periodDisplayA').innerHTML = `<i class="ti ti-calendar"></i> 분석 기간: ${dates[0]} ~ ${dates[dates.length-1]}`;
+  }
+  renderComparisonChart(parsedA, storeName, m, curTabA);
+  document.getElementById('hourLayout').innerHTML=''; document.getElementById('mainChartPanel').style.display='';
+  document.getElementById('weekdayDetail').classList.add('hidden'); if(document.getElementById('cvA')) document.getElementById('cvA').style.display='';
+  
+  if(curTabA === 'date') renderDateA(data,m); else if(curTabA === 'month') renderMonthA(data,m);
+  else if(curTabA === 'weekday') renderWeekdayA(data,m); 
+  else if(curTabA === 'hour') renderHourA(data,m); else if(curTabA === 'store') renderStoreA(data,m);
+  else if(curTabA === 'cross') renderCrossA(data,m); else if(curTabA === 'weekdayCross') renderWeekdayCrossA(data,m); 
+}
+
+function renderComparisonChart(allData, storeName, m, tab) {
+    const panel = document.getElementById('compareChartPanel'), titleEl = document.getElementById('compareTitle');
+    if (['store', 'cross', 'weekdayCross', 'month'].includes(tab)) { panel.style.display = 'none'; return; }
+    panel.style.display = ''; let labels = [], avgData = [], storeData = [], title = '';
+
+    if (tab === 'date') {
+        title = '매장 실적 비교 추이 (일자별 평균)'; labels = [...new Set(allData.map(r => r.date))].sort();
+        avgData = labels.map(d => { const dayRows = allData.filter(r => r.date === d); const storeCount = new Set(dayRows.map(r=>r.store)).size || 1; return dayRows.reduce((s, r) => s + (r.slots['합계']?.[m] || 0), 0) / storeCount; });
+        if (storeName !== 'ALL') { storeData = labels.map(d => { const r = allData.find(x => x.date === d && x.store === storeName); return r ? (r.slots['합계']?.[m] || 0) : 0; }); }
+    } else if (tab === 'weekday') {
+        title = '매장 실적 비교 추이 (요일별 평균)'; labels = DAY_ORDER.map(d => d + '요일');
+        avgData = DAY_ORDER.map(d => { const dayRows = allData.filter(r => r.day === d); let sum = 0; dayRows.forEach(r => sum += (r.slots['합계']?.[m] || 0)); return sum / (dayRows.length || 1); });
+        if (storeName !== 'ALL') { storeData = DAY_ORDER.map(d => { const dayRows = allData.filter(r => r.day === d && r.store === storeName); let sum = 0; dayRows.forEach(r => sum += (r.slots['합계']?.[m] || 0)); return sum / (dayRows.length || 1); }); }
+    } else if (tab === 'hour') {
+        title = '매장 실적 비교 추이 (시간대별 평균)'; labels = HOURS.map(h => h + '시');
+        avgData = HOURS.map(h => { let sum = 0; allData.forEach(r => sum += (r.slots[h]?.[m] || 0)); return sum / (allData.length || 1); });
+        if (storeName !== 'ALL') { storeData = HOURS.map(h => { let sum = 0; const storeRows = allData.filter(r => r.store === storeName); storeRows.forEach(r => sum += (r.slots[h]?.[m] || 0)); return sum / (storeRows.length || 1); }); }
+    }
+
+    titleEl.innerHTML = `<i class="ti ti-chart-line"></i> ${title}`;
+    let datasets = [{ label: '가맹점 전체 평균', data: avgData, borderColor: '#9ca3af', borderDash: [5, 5], borderWidth: 2, fill: false, tension: 0.1 }];
+    if (storeName !== 'ALL') datasets.push({ label: storeName.replace('맛나감자탕 ',''), data: storeData, borderColor: '#4f46e5', borderWidth: 3, fill: false, tension: 0.1 });
+
+    if(chartCompare) chartCompare.destroy();
+    chartCompare = new Chart(document.getElementById('cvCompare').getContext('2d'), {
+        type: 'line', data: { labels, datasets },
+        options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtA(c.raw, m)}` } } }, scales: { y: { ticks: { callback: v => m==='amt' ? (v>=10000 ? (v/10000).toFixed(0)+'만' : v) : v } }, x: { grid: { display: false } } } }
+    });
+}
+
+function renderDateA(data,m){
+  const agg={}; data.forEach(r=>{ const s = r.slots['합계']||{}; if(!agg[r.date]) agg[r.date]={ date: r.date, day: r.day, amt:0, cnt:0, cust:0 }; agg[r.date].amt+=s.amt||0; agg[r.date].cnt+=s.cnt||0; agg[r.date].cust+=s.cust||0; });
+  const rows = Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({label: `${x.date}(${x.day})`,val: x[m] || 0}));
+  const total = rows.reduce((s,x)=>s+x.val,0), peak = rows.length ? rows.reduce((a,b)=>b.val>a.val?b:a,rows[0]) : {label:'-',val:0};
+  setMetsA([{l:`총 ${metLabelA()}`, v:fmtA(total,m)}, {l:'최고 성과 일자', v:peak.label}, {l:'일자 최고치 값', v:fmtA(peak.val,m)}, {l:'총 집계 일수', v:rows.length+'일'}]);
+  drawBarA(`일자별 누적 ${metLabelA()}`, rows.map(r=>r.label), rows.map(r=>r.val), m);
+  drawTblA(['분석 일자', `총 ${metLabelA()}`, '전체 대비 비중'], rows.map(r=>[r.label, fmtA(r.val,m), (total>0?(r.val/total*100).toFixed(1):0)+'%']), ['','num','num']);
+}
+
+function renderMonthA(data, m) {
+  // 날짜에서 월 키 추출 ("MM-DD" → "MM월", "YYYY-MM-DD" → "YYYY-MM월")
+  function getMonthKey(date) {
+    const parts = date.split('-');
+    if(parts.length === 3) return parts[0]+'-'+parts[1]+'월';   // YYYY-MM-DD
+    if(parts.length === 2) return parts[0]+'월';                 // MM-DD
+    return date.substring(0,2)+'월';
+  }
+
+  // 월별 집계
+  const agg = {};
+  data.forEach(r => {
+    const s = r.slots['합계']||{};
+    const mk = getMonthKey(r.date);
+    if(!agg[mk]) agg[mk] = { month: mk, amt:0, cnt:0, cust:0, days: new Set() };
+    agg[mk].amt  += s.amt||0;
+    agg[mk].cnt  += s.cnt||0;
+    agg[mk].cust += s.cust||0;
+    agg[mk].days.add(r.date);
+  });
+
+  const rows = Object.values(agg).sort((a,b)=>a.month.localeCompare(b.month));
+  if(!rows.length) return;
+
+  const total  = rows.reduce((s,x)=>s+x[m],0);
+  const peak   = rows.reduce((a,b)=>b[m]>a[m]?b:a, rows[0]);
+  const avgDay = rows.map(r=>r[m]/(r.days.size||1));
+  const peakAvg= rows.reduce((a,b,i)=>avgDay[i]>avgDay[a.idx]?{idx:i,...b}:{...a}, {idx:0,...rows[0]});
+
+  setMetsA([
+    {l:`총 ${metLabelA()}`,      v: fmtA(total, m)},
+    {l:'최고 매출 월',            v: peak.month},
+    {l:'최고 월 일평균',          v: fmtA(peak[m]/(peak.days.size||1), m)},
+    {l:'집계 개월 수',            v: rows.length+'개월'},
+  ]);
+
+  // 차트: 월별 총합 막대 + 일평균 꺾은선 (이중 y축) + 평균 레퍼런스 선
+  const avgTotal  = rows.reduce((s,r)=>s+r[m],0) / (rows.length||1);
+  const avgDayAvg = avgDay.reduce((s,v)=>s+v,0) / (avgDay.length||1);
+
+  document.getElementById('ctA').innerHTML = `<i class="ti ti-chart-bar"></i> 월별 ${metLabelA()} (막대=총합 / 꺾은선=일평균 / 점선=평균)`;
+  if(chartA) chartA.destroy();
+  chartA = new Chart(document.getElementById('cvA').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: rows.map(r=>r.month),
+      datasets: [
+        {
+          type: 'bar',
+          label: `월 총 ${metLabelA()}`,
+          data: rows.map(r=>r[m]),
+          backgroundColor: rows.map((_,i)=>PAL[i%PAL.length]+'cc'),
+          borderRadius: 5,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: `전체 평균 (${fmtA(avgTotal,m)})`,
+          data: rows.map(()=>avgTotal),
+          borderColor: '#f59e0b',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          yAxisID: 'y'
+        },
+        {
+          type: 'line',
+          label: `일평균 ${metLabelA()}`,
+          data: rows.map((r,i)=>avgDay[i]),
+          borderColor: '#4f46e5',
+          backgroundColor: 'rgba(79,70,229,0.08)',
+          borderWidth: 2.5,
+          pointRadius: 5,
+          pointBackgroundColor: '#4f46e5',
+          fill: false,
+          tension: 0.2,
+          yAxisID: 'y2'
+        },
+        {
+          type: 'line',
+          label: `일평균 평균선 (${fmtA(avgDayAvg,m)})`,
+          data: rows.map(()=>avgDayAvg),
+          borderColor: '#10b981',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          yAxisID: 'y2'
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { legend: { position: 'top' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtA(c.raw, m)}` } } },
+      scales: {
+        y:  { position: 'left',  ticks: { callback: v => m==='amt'?(v>=10000?(v/10000).toFixed(0)+'만':v):v }, grid: { drawOnChartArea: true } },
+        y2: { position: 'right', ticks: { callback: v => m==='amt'?(v>=10000?(v/10000).toFixed(0)+'만':v):v }, grid: { drawOnChartArea: false } },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // 상세 표 (월 / 영업일 수 / 총합 / 일평균 / 전월 대비 / 비중)
+  const tblRows = rows.map((r, i) => {
+    const avg   = r[m] / (r.days.size||1);
+    const prev  = i > 0 ? rows[i-1][m] : null;
+    const diff  = prev !== null ? r[m] - prev : null;
+    const diffStr = diff === null ? '-' : (diff>=0?'▲ +':'▼ ') + fmtA(Math.abs(diff), m);
+    const diffColor = diff === null ? '' : diff>=0 ? 'color:#059669' : 'color:#dc2626';
+    return [
+      r.month,
+      r.days.size+'일',
+      fmtA(r[m], m),
+      fmtA(avg, m),
+      `<span style="${diffColor};font-weight:700">${diffStr}</span>`,
+      (total>0?(r[m]/total*100).toFixed(1):0)+'%'
+    ];
+  });
+  drawTblA(
+    ['월', '영업일 수', `월 총 ${metLabelA()}`, `일평균 ${metLabelA()}`, '전월 대비 변화', '전체 비중'],
+    tblRows,
+    ['','num','num','num','num','num']
+  );
+}
+
+function renderWeekdayA(data,m){
+  const agg = {}; DAY_ORDER.forEach(d => agg[d] = { total: 0, daysCount: 0, holidayStores: [] });
+  data.forEach(r => { const d = r.day, val = r.slots['합계'] ? r.slots['합계'][m] : 0; if (val > 0) { agg[d].total += val; agg[d].daysCount += 1; } else { agg[d].holidayStores.push(`${r.store.replace('맛나감자탕 ','')}(${r.date})`); } });
+  const rows = DAY_ORDER.map(d => ({ label: d+'요일', total: agg[d].total, daysCount: agg[d].daysCount, avgVal: agg[d].daysCount > 0 ? agg[d].total / agg[d].daysCount : 0 }));
+  const ot = rows.reduce((s,x)=>s+x.total,0), od = rows.reduce((s,x)=>s+x.daysCount,0), active = rows.filter(r=>r.daysCount>0), peak = active.length ? [...active].sort((a,b)=>b.avgVal-a.avgVal)[0] : {label:'-',avgVal:0};
+  setMetsA([{ l:'전체 요일 총합', v:fmtA(ot,m) }, { l:'평균 최고 요일', v:peak.label }, { l:'최고 요일 평균치', v:fmtA(peak.avgVal,m) }, { l:'유효 데이터수', v:od+'건' }]);
+  drawBarA(`요일별 평균 ${metLabelA()} (휴무제외)`, rows.map(r=>r.label), rows.map(r=>r.avgVal), m);
+  
+  const wdEl = document.getElementById('weekdayDetail'); let holidayHtml = "<strong><i class='ti ti-alert-circle'></i> [휴무/매출 0원 발생 내역 (평균에서 제외됨)]</strong><br>"; let hasHolidays = false;
+  DAY_ORDER.forEach(d => { if(agg[d].holidayStores.length > 0) { hasHolidays = true; holidayHtml += `<span style="display:inline-block; margin-top:4px;"><b>${d}요일:</b> ${agg[d].holidayStores.join(', ')}</span><br>`; } });
+  if(hasHolidays) { wdEl.innerHTML = holidayHtml; wdEl.classList.remove('hidden'); } else { wdEl.classList.add('hidden'); }
+  drawTblA(['분석 요일', '유효 영업수', `총 ${metLabelA()}`, `평균 ${metLabelA()}`, '전체 매출 비중'], rows.map(r=>[r.label, r.daysCount+'건', fmtA(r.total,m), fmtA(r.avgVal,m), (ot>0?(r.total/ot*100).toFixed(1):0)+'%']), ['', 'num', 'num', 'num', 'num']);
+}
+
+function renderHourA(data,m){
+  const hourAgg={}; HOURS.forEach(h=>hourAgg[h]={amt:0,cnt:0,cust:0}); data.forEach(r=>{HOURS.forEach(h=>{const s=r.slots[h]||{};hourAgg[h].amt+=s.amt||0;hourAgg[h].cnt+=s.cnt||0;hourAgg[h].cust+=s.cust||0;});});
+  const segAgg={}; SEGS.forEach(s=>segAgg[s.key]={amt:0,cnt:0,cust:0}); HOURS.forEach(h=>{ const sk=getSegKey(h); if(sk){segAgg[sk].amt+=hourAgg[h].amt;segAgg[sk].cnt+=hourAgg[h].cnt;segAgg[sk].cust+=hourAgg[h].cust;} });
+  const rows=HOURS.map(h=>({label:h+'시',val:hourAgg[h][m]||0,h})), active=rows.filter(x=>x.val>0), total=rows.reduce((s,x)=>s+x.val,0), peak=active.length?active.reduce((a,b)=>b.val>a.val?b:a,active[0]):{label:'-',val:0};
+  setMetsA([{l:`총 ${metLabelA()}`,v:fmtA(total,m)},{l:'최고 피크 타임',v:peak.label},{l:'시간대 최대 실적',v:fmtA(peak.val,m)},{l:'활성 영업 시간대',v:active.length+'구간'}]);
+  document.getElementById('mainChartPanel').style.display='none'; document.getElementById('hourLayout').innerHTML=`<div class="two-col"><div class="panel"><p class="panel-t"><i class="ti ti-chart-bar"></i> 시간대별 분포 추이 (누적)</p><canvas id="cvHour" style="max-height:260px"></canvas></div><div class="panel"><p class="panel-t"><i class="ti ti-layout-grid"></i> 운영구간 비중 요약</p><div class="seg-grid" id="segGrid"></div></div></div>`;
+  if(chartA)chartA.destroy();
+  chartA=new Chart(document.getElementById('cvHour').getContext('2d'),{ type:'bar', data:{labels:rows.map(r=>r.label),datasets:[{data:rows.map(r=>r.val),backgroundColor:rows.map(r=>{ const sk=getSegKey(r.h);const seg=SEGS.find(s=>s.key===sk); return seg?seg.color+'cc':'#88878099'; }),borderRadius:4}]}, options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtA(c.raw,m)}}},scales:{y:{ticks:{callback:v=>m==='amt'?(v>=10000?(v/10000).toFixed(0)+'만':v.toLocaleString()):v.toLocaleString()}},x:{grid:{display:false}}}} });
+  const segGrid=document.getElementById('segGrid'); SEGS.forEach(s=>{ const sv=segAgg[s.key][m]||0, pct=total>0?(sv/total*100).toFixed(1):0; segGrid.innerHTML+=`<div class="seg" style="background:${s.color};color:#fff"><div><div class="seg-name">${s.name}</div><div class="seg-range" style="opacity:.9">${s.range}</div></div><div class="seg-val"><div class="seg-amt">${m==='amt'?won(sv):sv.toLocaleString()}</div><div class="seg-pct" style="opacity:.9">${pct}%</div></div></div>`; });
+  drawTblA(['기준 시간대','운영 구간',metLabelA(),'점유율'],active.map(r=>{ const sk=getSegKey(r.h);const seg=SEGS.find(s=>s.key===sk); return[r.label,seg?seg.name:'-',fmtA(r.val,m),(total>0?(r.val/total*100).toFixed(1):0)+'%']; }),['','','num','num']);
+}
+
+function renderStoreA(data,m){
+  const agg={}; data.forEach(r=>{const s=r.slots['합계']||{};if(!agg[r.store])agg[r.store]={store:r.store,amt:0,cnt:0,cust:0};agg[r.store].amt+=s.amt||0;agg[r.store].cnt+=s.cnt||0;agg[r.store].cust+=s.cust||0;});
+  const rows=Object.values(agg).sort((a,b)=>b[m]-a[m]); const total=rows.reduce((s,x)=>s+x[m],0);
+  setMetsA([{l:`총합 ${metLabelA()}`,v:fmtA(total,m)},{l:'매장 매출 1위',v:rows[0]?.store.replace('맛나감자탕 ','')||'-'},{l:'집계 대상 매장',v:rows.length+'개'},{l:'매장 평균 단가',v:fmtA(total/rows.length,m)}]);
+  drawBarA(`가맹점별 실적 비교 (${metLabelA()})`,rows.map(r=>r.store.replace('맛나감자탕 ','')),rows.map(r=>r[m]),m);
+  drawTblA(['가맹점명',metLabelA(),'네트워크 비중'],rows.map(r=>[r.store.replace('맛나감자탕 ',''),fmtA(r[m],m),(total>0?(r[m]/total*100).toFixed(1):0)+'%']),['','num','num']);
+}
+
+function renderCrossA(data,m){
+  const agg={}, dates=[...new Set(data.map(r=>r.date))].sort(); dates.forEach(d=>{agg[d]={day:data.find(r=>r.date===d).day}; HOURS.forEach(h=>agg[d][h]=0);}); data.forEach(r=>{HOURS.forEach(h=>{const s=r.slots[h]||{}; agg[r.date][h]+=s[m]||0;});});
+  const activeH=HOURS.filter(h=>dates.some(d=>agg[d][h]>0)), maxV=Math.max(...dates.flatMap(d=>activeH.map(h=>agg[d][h])),1), totalAvg=dates.flatMap(d=>activeH.map(h=>agg[d][h])).reduce((s,v)=>s+v,0)/dates.length;
+  document.getElementById('mainChartPanel').style.display='none'; const thead=document.querySelector('#tblA thead'),tbody=document.querySelector('#tblA tbody');
+  thead.innerHTML='<tr><th>분석 일자</th>'+activeH.map(h=>{ const seg=SEGS.find(s=>s.key===getSegKey(h)); return`<th style="text-align:center;font-size:11px;color:${seg?seg.color:'inherit'}">${h}시</th>`; }).join('')+'<th class="num">합계</th></tr>';
+  tbody.innerHTML=dates.map(d=>{ const rt=activeH.reduce((s,h)=>s+agg[d][h],0); const cells=activeH.map(h=>{ const v=agg[d][h]; const alpha=Math.round((v/maxV)*210).toString(16).padStart(2,'0'); const seg=SEGS.find(s=>s.key===getSegKey(h)); const col=seg?seg.color:'#888780'; const disp=v>0?(m==='amt'?(v>=10000?(v/10000).toFixed(1)+'만':Math.round(v).toLocaleString()):v.toFixed(1)):'-'; return`<td style="text-align:center;padding:6px;background:${col}${alpha};font-size:11px;font-weight:700">${disp}</td>`; }); return`<tr><td style="font-weight:700;background:#f8fafc">${d}(${agg[d].day})</td>${cells.join('')}<td class="num" style="font-weight:700;background:#f8fafc">${fmtA(rt,m)}</td></tr>`; }).join('');
+  setMetsA([{l:'일자·시간당 평균',v:fmtA(totalAvg,m)},{l:'최고 성과 일자',v:dates.reduce((a,d)=>activeH.reduce((s,h)=>s+agg[d][h],0)>activeH.reduce((s,h)=>s+agg[a][h],0)?d:a,dates[0])},{l:'유효 모니터링 시간',v:activeH.length+'구간'}]);
+}
+
+function renderWeekdayCrossA(data,m){
+  const agg = {}; DAY_ORDER.forEach(d => {agg[d]={dates:new Set()}; HOURS.forEach(h=>agg[d][h]=0);}); data.forEach(r => {const d=r.day; if(!agg[d])return; agg[d].dates.add(r.date); HOURS.forEach(h => agg[d][h]+=(r.slots[h]||{})[m]||0);});
+  const activeH = HOURS.filter(h => DAY_ORDER.some(d => agg[d][h] > 0)), maxV = Math.max(...DAY_ORDER.flatMap(d=>activeH.map(h=>agg[d][h]/(agg[d].dates.size||1))), 1), totalAvg = DAY_ORDER.flatMap(d=>activeH.map(h=>agg[d][h]/(agg[d].dates.size||1))).reduce((s,v)=>s+v,0)/Math.max(DAY_ORDER.filter(d=>agg[d].dates.size>0).length, 1);
+  document.getElementById('mainChartPanel').style.display='none'; const thead=document.querySelector('#tblA thead'),tbody=document.querySelector('#tblA tbody');
+  thead.innerHTML='<tr><th>분석 요일 (일수)</th>'+activeH.map(h=>{ const seg=SEGS.find(s=>s.key===getSegKey(h)); return`<th style="text-align:center;font-size:11px;color:${seg?seg.color:'inherit'}">${h}시</th>`; }).join('')+'<th class="num">평균 합계</th></tr>';
+  tbody.innerHTML = DAY_ORDER.map(d => { const dc=agg[d].dates.size||1, rt=activeH.reduce((s,h)=>s+(agg[d][h]/dc),0); if(dc===0 && rt===0) return ''; const cells = activeH.map(h => { const v = agg[d][h]/dc; const alpha = Math.round((v/maxV)*210).toString(16).padStart(2,'0'); const seg = SEGS.find(s=>s.key===getSegKey(h)); const col = seg?seg.color:'#888780'; const disp = v>0?(m==='amt'?(v>=10000?(v/10000).toFixed(1)+'만':Math.round(v).toLocaleString()):v.toFixed(1)):'-'; return `<td style="text-align:center;padding:6px;background:${col}${alpha};font-size:11px;font-weight:700">${disp}</td>`; }); return `<tr><td style="font-weight:700;background:#f8fafc">${d}요일 <span style="font-size:11px;color:#9ca3af;font-weight:normal">(${agg[d].dates.size}일)</span></td>${cells.join('')}<td class="num" style="font-weight:700;background:#f8fafc">${fmtA(rt, m)}</td></tr>`; }).join('');
+  setMetsA([{l:'요일별 시간당 평균', v:fmtA(totalAvg, m)},{l:'유효 모니터링 시간', v:activeH.length + '구간'}]);
+}
+
+function setMetsA(arr){ document.getElementById('metsA').innerHTML=arr.map(x=>`<div class="mc"><div class="mc-l">${x.l}</div><div class="mc-v">${x.v}</div></div>`).join(''); }
+function drawBarA(title,labels,vals,m){
+  document.getElementById('ctA').innerHTML=`<i class="ti ti-chart-bar"></i> ${title}`; if(chartA) chartA.destroy();
+  chartA = new Chart(document.getElementById('cvA').getContext('2d'),{ type:'bar', data:{labels, datasets:[{data:vals, backgroundColor:labels.map((_,i)=>PAL[i%PAL.length]+'cc'), borderRadius:4}]}, options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>fmtA(c.raw,m)}}}, scales:{y:{ticks:{callback:v=>m==='amt'?(v>=10000?(v/10000).toFixed(0)+'만':v.toLocaleString()):v.toLocaleString()}},x:{grid:{display:false}}}} });
+}
+function drawTblA(heads,rows,aligns){
+  document.querySelector('#tblA thead').innerHTML='<tr>'+heads.map((h,i)=>`<th${aligns[i]==='num'?' class="num"':''}>${h}</th>`).join('')+'</tr>';
+  document.querySelector('#tblA tbody').innerHTML=rows.map(r=>'<tr>'+r.map((c,i)=>`<td${aligns[i]==='num'?' class="num"':''}>${c}</td>`).join('')+'</tr>').join('');
+}
+function resetA(){
+    parsedA=null;
+    document.getElementById('upA').classList.remove('hidden');
+    document.getElementById('resA').classList.add('hidden');
+    document.getElementById('fiA').value='';
+    document.getElementById('storeSearchInput').value='';
+    document.getElementById('searchResultA').classList.add('hidden');
+}
+
+function renderSearchA(keyword) {
+    const kw = keyword.replace(/\s/g,'').toLowerCase();
+    const panel = document.getElementById('searchResultA');
+    if(!kw || !parsedA) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    const m = document.getElementById('metSel').value;
+    const matched = parsedA.filter(r =>
+        r.store.replace(/\s/g,'').toLowerCase().includes(kw) ||
+        r.date.replace(/\s/g,'').toLowerCase().includes(kw) ||
+        r.day.replace(/\s/g,'').toLowerCase().includes(kw)
+    );
+    const agg = {};
+    matched.forEach(r => {
+        const key = r.date+'|'+r.store;
+        if(!agg[key]) agg[key]={date:r.date,day:r.day,store:r.store,amt:0,cnt:0,cust:0};
+        const s=r.slots['합계']||{};
+        agg[key].amt+=s.amt||0; agg[key].cnt+=s.cnt||0; agg[key].cust+=s.cust||0;
+    });
+    const rows = Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)||a.store.localeCompare(b.store));
+    const totalVal = rows.reduce((s,r)=>s+(r[m]||0),0);
+    const peakRow  = rows.length ? rows.reduce((a,b)=>(b[m]||0)>(a[m]||0)?b:a) : null;
+    const storeSet = [...new Set(rows.map(r=>r.store))];
+    document.getElementById('searchTitleA').innerHTML=`<i class="ti ti-search"></i> "<b>${keyword}</b>" 검색 결과 — ${rows.length}건 / ${storeSet.length}개 매장`;
+    document.getElementById('searchMetsA').innerHTML=rows.length?`
+        <div class="mc"><div class="mc-l">검색 총 ${fmtA(0,m)?'실매출액':'지표'}</div><div class="mc-v">${fmtA(totalVal,m)}</div></div>
+        <div class="mc"><div class="mc-l">결과 건수</div><div class="mc-v">${rows.length}건</div></div>
+        <div class="mc"><div class="mc-l">해당 매장 수</div><div class="mc-v">${storeSet.length}개</div></div>
+        ${peakRow?`<div class="mc" style="border-left-color:#f59e0b"><div class="mc-l">최고 일자</div><div class="mc-v" style="font-size:12px;color:#d97706">${peakRow.date}(${peakRow.day}) ${peakRow.store.replace('맛나감자탕 ','')}</div></div>`:''}
+    `:'';
+    const tbl=document.getElementById('tblSearchA');
+    if(!rows.length){tbl.querySelector('thead').innerHTML='';tbl.querySelector('tbody').innerHTML=`<tr><td colspan="5" style="text-align:center;color:#9ca3af;padding:24px">"${keyword}"에 해당하는 데이터가 없습니다.</td></tr>`;return;}
+    const re=new RegExp('('+keyword.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    const allTotal=parsedA.reduce((s,r)=>s+(r.slots['합계']?.[m]||0),0)||1;
+    tbl.querySelector('thead').innerHTML=`<tr><th>날짜</th><th>요일</th><th>매장명</th><th class="num">${{amt:'실매출액',cnt:'매출건수',cust:'고객수'}[m]}</th><th class="num">비중</th></tr>`;
+    tbl.querySelector('tbody').innerHTML=rows.map(r=>{
+        const val=r[m]||0;
+        const hl=t=>t.replace(re,'<mark style="background:#fef08a;border-radius:2px;padding:0 2px">$1</mark>');
+        return`<tr><td><b>${hl(r.date)}</b></td><td>${hl(r.day)}요일</td><td>${hl(r.store.replace('맛나감자탕 ',''))}</td><td class="num" style="font-weight:700;color:var(--primary-accent)">${fmtA(val,m)}</td><td class="num"><span class="pct-box pct-total">${(val/allTotal*100).toFixed(2)}%</span></td></tr>`;
+    }).join('');
+}
+
+function copyForAIA() {
+    if(!parsedA || parsedA.length === 0) return; const m = document.getElementById('metSel').value; const store = document.getElementById('storeSel').value; const metricName = {amt:'실매출액', cnt:'매출건수', cust:'고객수'}[m];
+    let report = `[맛나감자탕 분석 데이터 요약 - ${curTabA}]\n지표: ${metricName}, 매장: ${store}\n\n`; const ths = Array.from(document.querySelectorAll('#tblA th')).map(th => th.innerText.trim()).join('\t'); report += ths + '\n';
+    const trs = Array.from(document.querySelectorAll('#tblA tbody tr')).slice(0, 30); trs.forEach(tr => { report += Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()).join('\t') + '\n'; }); report += `\n\n위 데이터를 분석해서 우리 매장의 매출 증대를 위한 맞춤형 마케팅 및 운영 전략 3가지를 구체적으로 제안해줘.`; navigator.clipboard.writeText(report).then(() => alert("제미나이(AI) 질문 데이터가 복사되었습니다!"));
+}
+
+// ==========================================
+// SECTION B 
+// ==========================================
+let parsedB = [], activeFilterB = "전체", sortStateB = { col: 'tn', desc: true };
+let parsedBRaw = []; // 매장 정보 포함 원본
+let chartBCompare = null;
+const userTabsB = ["감자탕", "뼈찜", "간장뼈찜", "뼈구이", "세트", "식사", "사리", "음료", "배달", "포장", "기타"];
+setupDrop('dzB','fiB',loadB);
+
+function normalizeMenuName(rawName) {
+    let name = String(rawName).replace(/\.+$/, "").replace(/[\s_]+/g, '').trim();
+    const removeKeywords = ['[배달]', '(점심특선)', '[배민]', '[포장]', 't->', '웹', '앱', '(조리)', '(비조리)'];
+    removeKeywords.forEach(k => { const esc = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); name = name.replace(new RegExp('^' + esc, 'i'), '').replace(new RegExp(esc + '$', 'i'), ''); });
+
+    // 목목뼈 → 목뼈 오타 병합
+    name = name.replace(/목목뼈/g, '목뼈');
+    // 해물뼈찜 → 해물목뼈찜
+    if (/해물뼈찜/.test(name)) name = name.replace('해물뼈찜', '해물목뼈찜');
+    // 간장뼈찜 → 간장목뼈찜
+    if (/^간장뼈찜/.test(name)) name = name.replace('간장뼈찜', '간장목뼈찜');
+    if (/치즈간장뼈찜/.test(name)) name = name.replace('치즈간장뼈찜', '치즈간장목뼈찜');
+    // 뼈찜(소|중|대|커플) → 목뼈찜
+    if (/^뼈찜\((소|중|대|커플)\)$/.test(name)) name = name.replace('뼈찜', '목뼈찜');
+
+    // 감자탕 크기 통일
+    if (/감자탕\(소\)|목뼈감자탕\(소\)/.test(name)) return '목뼈감자탕(소)';
+    if (/감자탕\(중\)|목뼈감자탕\(중\)/.test(name)) return '목뼈감자탕(중)';
+    if (/감자탕\(대\)|목뼈감자탕\(대\)/.test(name)) return '목뼈감자탕(대)';
+    if (/감자탕\(커플\)|목뼈감자탕\(커플\)/.test(name)) return '목뼈감자탕(커플)';
+
+    if (name.includes('라면옹심이')) return '목뼈라면옹심이';
+    if (name.includes('목뼈중화면')) return '목뼈중화면(식사)';
+    if (name.includes('불뼈구이')) return name.replace('불뼈구이', '맥반석불뼈구이');
+    if (name.includes('간장뼈구이')) return name.replace('간장뼈구이', '간장목뼈구이');
+    if (name.includes('우거지해장국') && name.includes('고기없는')) return '우거지해장국(고기없음)';
+
+    // 사리류 이름 통일
+    if (name.includes('볶음밥(탕)') || name.includes('볶음밥(찜)') || name.includes('셀프볶음밥')) return '볶음밥';
+    if (name.includes('뼈추가(탕)') || name.includes('뼈추가(찜)')) return '뼈추가';
+    if (name.includes('낙지추가(탕)') || name.includes('낙지추가(찜)') || name.includes('낙지추가(2마리)')) return '낙지추가(1마리)';
+    if (name.includes('수제비(탕)') || name.includes('수제비(찜)')) return '수제비사리';
+    if (name.includes('어린이영양밥')) return '영양밥';
+    if (name.includes('문어비엔나(5개)')) return '문어비엔나';
+    if (name.includes('누꽃치즈추가') || name.includes('눈꽃치즈추가')) return '눈꽃치즈추가';
+
+    // 메뉴 병합
+    if (/^목뼈순두부$/.test(name)) return '목뼈순두부해장국';
+    if (/^목뼈수제비$/.test(name)) return '목뼈수제비해장국';
+    if (name.includes('킬바사소세지')) return name.replace('킬바사소세지', '킬바사소시지');
+
+    return name;
+}
+
+function getCategory(name, rawCat, ch) {
+    // ── 배달은 완전히 독립 카테고리 ──
+    // 배달로 주문된 메뉴는 cat='배달'로만 집계, 다른 카테고리에 포함 안 됨
+    if (ch === '배달' || rawCat.includes('배달')) return '배달';
+
+    if (name.includes('비조리,밥별도')) return '포장';
+    if (name.includes('에이드') && name.includes('솥밥')) return '세트';
+
+    // ── 세트 메뉴 카테고리 이관 ──
+    if (/치즈간장목뼈찜세트|간장목뼈찜세트/.test(name)) return '간장뼈찜';
+    if (/해물뼈찜세트|해물목뼈찜세트/.test(name)) return '뼈찜';
+    if (/감자탕세트/.test(name)) return '감자탕';
+    if (/맥반석간장목뼈구이세트|맥반석불뼈구이세트|매콤로제뼈구이세트/.test(name)) return '뼈구이';
+
+    // ── 기타로 이동 ──
+    if (name.includes('뼈구이드신분') || name.includes('뼈찜드신분')) return '기타';
+
+    // ── 기타→음료 이관 ──
+    const 기타음료 = ['이프로부족할때복숭아500ml','게토레이레몬600ml','캐나다드라이진저에일250ml','초정탄산수500ml','자몽에이드1L'];
+    if (기타음료.some(k=>name.includes(k.replace(/\s/g,'')))) return '음료';
+
+    // ── 기타→사리 이관 ──
+    const 기타사리 = ['폭탄치즈(150g)','포켓몬조미김','찜국물','감자추가','김가루','납작당면','계란찜','킬바사소시지(1개)'];
+    if (기타사리.some(k=>name===k.replace(/\s/g,''))) return '사리';
+
+    // ── 기타→식사 이관 ──
+    if (['등심돈까스','치즈돈까스'].some(k=>name===k)) return '식사';
+
+    // 1. 식사류
+    if (/볶음밥\([23]인분\)/.test(name)) return '사리';
+    if (name.includes('4인분')) return '식사';
+    if (name.includes('목뼈수제비해장국')) return '식사';
+    if (name.includes('목뼈순두부해장국')) return '식사';
+    if (['1인분','2인분','3인분','중화면(식사)','라면옹심이','해장국','칼국수','순두부','덮밥'].some(k=>name.includes(k))) return '식사';
+
+    // 2. 사리류
+    const sariKeys = ['버터간장계란밥','날치알추가','야채추가','공기밥','육수추가','사리','튀김','분모자','떡','만두','솥밥','볶음밥','뼈추가','영양밥','우거지추가','주먹밥','눈꽃치즈','누꽃치즈','낙지추가','수제비','문어비엔나','감자옹심이','곤이추가','깍두기추가'];
+    if (sariKeys.some(k=>name.includes(k))) return '사리';
+
+    // 3. 음료/주류
+    const drinkKeys = ['콜라','사이다','음료','소주','맥주','좋은데이','참이슬','진로','카스','화이트제로','무알콜','클라우드','논알콜','브레드이발소','분다버그','청하','로제하이볼','복분자','짐빔','하이볼','아이스티','쿨피스','탐스','막걸리','매실에이드','시원','켈리','대선'];
+    if (drinkKeys.some(k=>name.includes(k)) || rawCat.includes('음료') || rawCat.includes('주류')) return '음료';
+
+    // 4. 기타
+    if (['포장용기','솜사탕','누룽지맛','별뽀빠이'].includes(name)) return '기타';
+
+    // 5. 메인 카테고리
+    if (name.includes('간장목뼈찜') || (name.includes('간장') && !name.includes('구이'))) return '간장뼈찜';
+    if (name.includes('뼈찜') || name.includes('해물목뼈찜')) return '뼈찜';
+    if (name.includes('+') || name.includes('세트')) return '세트';
+    if (name.includes('뼈구이')) return '뼈구이';
+    if (name.includes('감자탕')) return '감자탕';
+
+    return '기타';
+}
+
+async function loadB(files){
+  if(!files || files.length === 0) return;
+  document.getElementById('upB').classList.add('hidden');
+  const rawList = []; // { store, name, cat, tq, net, ch }
+
+  for (let file of files) {
+      const data = await readFileAsync(file);
+      const wb = XLSX.read(data, {type:'array'});
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:''});
+
+      // ── 매장명 추출: "매장선택 : [N13970] 맛나감자탕 군산조촌점" 패턴 ──
+      let fileStoreName = '';
+      for(let i = 0; i < Math.min(raw.length, 10); i++) {
+          const rowText = raw[i].map(v => String(v||'')).join(' ');
+          const m = rowText.match(/매장선택\s*:\s*(?:\[[^\]]*\]\s*)?(맛나감자탕\s*[가-힣\w]+)/);
+          if(m) { fileStoreName = m[1].replace(/\s+/g,' ').trim(); break; }
+          const m2 = rowText.match(/\[[^\]]+\]\s*(맛나감자탕\s*[가-힣\w]+)/);
+          if(m2) { fileStoreName = m2[1].replace(/\s+/g,' ').trim(); break; }
+      }
+      // 파일명 폴백
+      if(!fileStoreName) {
+          const fnMatch = file.name.match(/맛나감자탕[\s_]?([가-힣A-Za-z0-9]+)/);
+          if(fnMatch) fileStoreName = '맛나감자탕 ' + fnMatch[1];
+      }
+      if(!fileStoreName) fileStoreName = file.name.replace(/\.[^.]+$/,'');
+      console.log('[B파일 매장명]', file.name, '→', fileStoreName);
+
+      // ── 헤더 행 탐색 ──
+      let headerIdx = -1;
+      for(let i = 0; i < raw.length; i++) {
+          if(raw[i].some(v => String(v||'').replace(/\s/g,'') === '상품명')) { headerIdx = i; break; }
+      }
+      if(headerIdx < 0) continue;
+
+      const h = raw[headerIdx].map(v => String(v||'').replace(/\s/g,''));
+
+      const CI = {
+          cat:   h.findIndex(v => v.includes('대분류') || v === '분류'),
+          name:  h.findIndex(v => v === '상품명'),
+          qty:   h.findIndex(v => v === '수량'),
+          net:   h.findIndex(v => v === '실매출액' || v.includes('실매출')),
+          gross: h.findIndex(v => v === '총매출액' || v.includes('총매출')),
+          store: h.findIndex(v => v.includes('매장') || v.includes('가맹점'))
+      };
+      const netCol = CI.net >= 0 ? CI.net : CI.gross;
+
+      raw.slice(headerIdx + 1).forEach(r => {
+          if(!r[CI.name]) return;
+          const rawName = String(r[CI.name]||'').trim();
+          if(!rawName || rawName === '합계' || rawName === '소계') return;
+
+          const net = parseFloat(String(r[netCol]||'0').replace(/,/g,''))||0;
+          if(net === 0) return;
+
+          const rawCat = CI.cat>=0 ? String(r[CI.cat]||'').trim() : '';
+          const qty    = CI.qty>=0 ? parseFloat(String(r[CI.qty]||'0').replace(/,/g,''))||0 : 0;
+
+          let store = fileStoreName;
+          if(CI.store >= 0) {
+              const s = String(r[CI.store]||'').trim();
+              if(s && s !== '합계' && s !== '소계') store = s;
+          }
+
+          let ch = '일반 홀';
+          if(rawName.includes('포장')) ch = '포장';
+          else if(rawName.startsWith('t->') || rawName.startsWith('T->')) ch = '티오더(홀)';
+          else if(/배달|배민|요기요|쿠팡|웹|앱/.test(rawName) || rawCat === '배달') ch = '배달';
+
+          const normName = normalizeMenuName(rawName);
+          const finalCat = getCategory(normName, cleanStr(rawCat), ch);
+          rawList.push({ store, name: normName, cat: finalCat, tq: qty, net, ch });
+      });
+  }
+
+  if(!rawList.length) { alert('유효한 상품 매출 데이터가 없습니다.'); document.getElementById('upB').classList.remove('hidden'); return; }
+
+  parsedBRaw = rawList;
+
+  // 매장 목록 구성 + 셀렉터 (항상 표시)
+  const storesDetected = [...new Set(rawList.map(r=>r.store))].sort();
+  const stores = storesDetected;
+  const sel = document.getElementById('storeBSel');
+  const selRow = document.getElementById('storeBSelRow');
+  sel.innerHTML = '';
+  if(stores.length > 1) {
+      sel.innerHTML = '<option value="ALL">전체 매장 합산</option>';
+      stores.forEach(s => { const o = document.createElement('option'); o.value=s; o.textContent=s.replace('맛나감자탕 ',''); sel.appendChild(o); });
+      document.getElementById('storeBCount').textContent = `(${stores.length}개 매장 감지됨)`;
+  } else {
+      stores.forEach(s => { const o = document.createElement('option'); o.value=s; o.textContent=s.replace('맛나감자탕 ',''); sel.appendChild(o); });
+      document.getElementById('storeBCount').textContent = stores.length ? `(감지: ${stores[0]})` : '';
+  }
+  selRow.style.display = 'flex';
+
+  activeFilterB = "전체"; sortStateB = { col: 'tn', desc: true };
+  document.getElementById('resB').classList.remove('hidden');
+  renderB();
+}
+
+function getNetByTab(r, tab) { if (tab === "배달") return r.ch['배달'] || 0; if (tab === "포장") return r.ch['포장'] || 0; return r.tn || 0; }
+function handleSortB(col) { if (sortStateB.col === col) sortStateB.desc = !sortStateB.desc; else { sortStateB.col = col; sortStateB.desc = true; } renderBTable(); }
+
+// rawList → 선택 매장 기준으로 parsedB 재집계
+function buildParsedB(storeFilter) {
+    const src = storeFilter === 'ALL' || !storeFilter
+        ? parsedBRaw
+        : parsedBRaw.filter(r=>r.store===storeFilter);
+    const map = {};
+    src.forEach(r => {
+        const key = r.name + '|||' + r.cat;
+        if(!map[key]) map[key] = { name:r.name, cat:r.cat, tq:0, tn:0, ch:{'일반 홀':0,'티오더(홀)':0,'배달':0,'포장':0} };
+        map[key].tq += r.tq;
+        map[key].tn += r.net;
+        map[key].ch[r.ch] += r.net;
+    });
+    return Object.values(map);
+}
+
+function renderB(){
+    const storeFilter = document.getElementById('storeBSel')?.value || 'ALL';
+    parsedB = buildParsedB(storeFilter);
+
+    const total = parsedB.reduce((s,r)=>s+r.tn,0);
+    const del   = parsedB.reduce((s,r)=>s+r.ch['배달'],0);
+    const take  = parsedB.reduce((s,r)=>s+r.ch['포장'],0);
+    const hall  = total - del - take;
+    const hallPct = total>0?((hall/total)*100).toFixed(1):0;
+    const delPct  = total>0?((del/total)*100).toFixed(1):0;
+    const takePct = total>0?((take/total)*100).toFixed(1):0;
+    const menuCount = parsedB.length;
+    const topMenu = [...parsedB].sort((a,b)=>b.tn-a.tn)[0];
+
+    document.getElementById('metsB').innerHTML = `
+        <div class="mc tip" data-tip="전체 실매출액 합계\n실매출액 = 총매출액 − 할인액" style="border-left-color:#1e293b"><div class="mc-l">전체 실매출 합계</div><div class="mc-v">${fmt(total)}원</div></div>
+        <div class="mc tip" data-tip="일반 홀 + 티오더(홀) 합산\n배달·포장 제외한 매장 내 취식 매출" style="border-left-color:var(--primary-accent)"><div class="mc-l">홀 매출 (일반+티오더)</div><div class="mc-v">${fmt(hall)}원 <span style="font-size:13px;color:#64748b">(${hallPct}%)</span></div></div>
+        <div class="mc tip" data-tip="배달앱(배민·요기요·쿠팡 등) 주문 매출\n★ 배달은 독립 측정 — 감자탕·뼈찜 등 카테고리에 포함되지 않습니다" style="border-left-color:#ef4444"><div class="mc-l">배달 매출 (독립)</div><div class="mc-v" style="color:#ef4444">${fmt(del)}원 <span style="font-size:13px;color:#ef4444;opacity:.8">(${delPct}%)</span></div></div>
+        <div class="mc tip" data-tip="포장 주문 매출\n포장은 카테고리에 포함 — 감자탕 포장 주문은 감자탕 카테고리와 포장 탭 양쪽에 집계됩니다" style="border-left-color:#10b981"><div class="mc-l">포장 매출</div><div class="mc-v" style="color:#10b981">${fmt(take)}원 <span style="font-size:13px;color:#10b981;opacity:.8">(${takePct}%)</span></div></div>
+        <div class="mc tip" data-tip="현재 선택된 매장·필터 기준 고유 메뉴 종류 수" style="border-left-color:#f59e0b"><div class="mc-l">분석 메뉴 수</div><div class="mc-v">${menuCount}종</div></div>
+        <div class="mc tip" data-tip="실매출액 기준 1위 메뉴" style="border-left-color:#8b5cf6"><div class="mc-l">베스트 메뉴</div><div class="mc-v" style="font-size:13px;color:#7c3aed">${topMenu?.name||'-'}</div></div>
+    `;
+
+    const tabTips = {
+        '전체':'모든 메뉴의 실매출액 합계를 봅니다.',
+        '감자탕':'감자탕 카테고리 메뉴만 표시\n(홀+포장 주문 모두 포함)',
+        '뼈찜':'뼈찜 카테고리 메뉴만 표시',
+        '간장뼈찜':'간장뼈찜 카테고리 메뉴만 표시',
+        '뼈구이':'뼈구이 카테고리 메뉴만 표시',
+        '세트':'세트 메뉴만 표시',
+        '식사':'식사류 메뉴만 표시',
+        '사리':'사리·추가 품목만 표시',
+        '음료':'음료·주류만 표시',
+        '배달':'배달 채널로 주문된 메뉴만 표시\n※ 배달로 나간 감자탕은 감자탕 탭과 이 탭 양쪽에 집계됩니다',
+        '포장':'포장 채널로 주문된 메뉴만 표시\n※ 포장으로 나간 뼈찜은 뼈찜 탭과 이 탭 양쪽에 집계됩니다',
+        '기타':'기타 품목만 표시'
+    };
+    document.getElementById('tabsFilterB').innerHTML = ["전체", ...userTabsB].map(m=>`<button class="tab tip ${activeFilterB===m?'on':''}" data-tip="${tabTips[m]||m}" onclick="setFilterB('${m}')">${m}</button>`).join('');
+    renderBTable();
+
+    // 카테고리별 요약 테이블
+    const cats = userTabsB.filter(c=>c!=='배달'&&c!=='포장');
+    const catRows = cats.map(cat=>{
+        const items = parsedB.filter(r=>r.cat===cat);
+        const catTotal = items.reduce((s,r)=>s+r.tn,0);
+        const catDel   = items.reduce((s,r)=>s+(r.ch['배달']||0),0);
+        const catTake  = items.reduce((s,r)=>s+(r.ch['포장']||0),0);
+        const catHall  = catTotal - catDel - catTake;
+        return {
+            cat,
+            count: items.length,
+            catTotal, catHall, catDel, catTake,
+            catQty: items.reduce((s,r)=>s+r.tq,0),
+            pct: total>0?(catTotal/total*100).toFixed(1):'0.0',
+            hallPct: catTotal>0?(catHall/catTotal*100).toFixed(1):'0.0',
+            takePct: catTotal>0?(catTake/catTotal*100).toFixed(1):'0.0',
+            delPct:  catTotal>0?(catDel/catTotal*100).toFixed(1):'0.0',
+            color: CAT_COLORS[cat]||'#64748b'
+        };
+    }).filter(r=>r.catTotal>0).sort((a,b)=>b.catTotal-a.catTotal);
+    const maxSales=catRows.length?catRows[0].catTotal:1;
+
+    document.getElementById('catSummaryB').innerHTML=catRows.length?`
+        <div style="padding:10px 14px;background:#fef9c3;border-bottom:1px solid #fde68a;font-size:12px;color:#92400e;line-height:1.6;">
+            <b>📌 집계 기준 안내</b><br>
+            • <b>카테고리 매출(감자탕·뼈찜 등) = 홀 + 포장</b> — 배달은 포함되지 않습니다.<br>
+            • <b>배달은 독립 측정</b> — 배달로 주문된 메뉴는 배달 탭에서만 집계됩니다.<br>
+            • <b>포장은 카테고리에 포함</b> — 감자탕을 포장 주문하면 감자탕 카테고리에 포함되고, 포장 탭에서도 볼 수 있습니다.
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+                <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                    <th rowspan="2" style="padding:8px 12px;text-align:left;font-weight:700;color:#374151;vertical-align:middle;">카테고리</th>
+                    <th rowspan="2" class="tip" data-tip="해당 카테고리 고유 메뉴 종류 수" style="padding:8px 8px;text-align:right;font-weight:700;color:#374151;cursor:help;vertical-align:middle;">메뉴수 ⓘ</th>
+                    <th rowspan="2" class="tip" data-tip="홀+포장+배달 전체 합산 실매출액" style="padding:8px 8px;text-align:right;font-weight:700;color:#374151;cursor:help;vertical-align:middle;">총매출 ⓘ</th>
+                    <th rowspan="2" class="tip" data-tip="전체 대비 이 카테고리 비중" style="padding:8px 8px;text-align:right;font-weight:700;color:#374151;cursor:help;vertical-align:middle;">비중 ⓘ</th>
+                    <th colspan="3" style="padding:6px 8px;text-align:center;font-weight:700;color:#374151;border-bottom:1px solid #e2e8f0;border-left:2px solid #e2e8f0;">채널별 매출 분해</th>
+                    <th rowspan="2" style="padding:8px 4px;font-weight:700;color:#374151;min-width:100px;vertical-align:middle;">비율 바</th>
+                </tr>
+                <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+                    <th class="tip" data-tip="일반 홀 + 티오더(홀)\n매장 내 취식 매출" style="padding:5px 8px;text-align:right;font-weight:700;color:#4f46e5;cursor:help;border-left:2px solid #e2e8f0;">홀 ⓘ</th>
+                    <th class="tip" data-tip="포장 주문 매출\n※ 이 금액은 포장 탭에도 동시에 집계됩니다" style="padding:5px 8px;text-align:right;font-weight:700;color:#10b981;cursor:help;">포장 ⓘ</th>
+                    <th class="tip" data-tip="배달앱 주문 매출\n※ 이 금액은 배달 탭에도 동시에 집계됩니다" style="padding:5px 8px;text-align:right;font-weight:700;color:#ef4444;cursor:help;">배달 ⓘ</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${catRows.map((r,i)=>{
+                    const tipMap = {
+                        '감자탕':'감자탕류 메뉴 합계\n홀 + 포장 주문 모두 포함',
+                        '뼈찜':'뼈찜류 메뉴 합계',
+                        '간장뼈찜':'간장뼈찜류 메뉴 합계',
+                        '뼈구이':'뼈구이류 메뉴 합계',
+                        '세트':'세트 메뉴 합계',
+                        '식사':'식사류 합계',
+                        '사리':'사리·추가 품목 합계',
+                        '음료':'음료·주류 합계',
+                        '기타':'기타 품목 합계'
+                    };
+                    const hasTake = r.catTake > 0;
+                    const hasDel  = r.catDel  > 0;
+                    return `<tr class="tip" data-tip="${tipMap[r.cat]||r.cat}" style="border-bottom:1px solid #f1f5f9;${i%2?'background:#fafafa':''};cursor:pointer;" onclick="setFilterB('${r.cat}')">
+                        <td style="padding:9px 12px;">
+                            <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:7px;vertical-align:middle;"></span>
+                            <b>${r.cat}</b>
+                        </td>
+                        <td style="padding:9px 8px;text-align:right;color:#64748b;font-weight:600">${r.count}종</td>
+                        <td style="padding:9px 8px;text-align:right;font-weight:700;color:var(--primary-accent)">${fmt(r.catTotal)}원</td>
+                        <td style="padding:9px 8px;text-align:right;">
+                            <span style="background:${r.color}22;color:${r.color};font-weight:800;padding:2px 7px;border-radius:4px;font-size:12px">${r.pct}%</span>
+                        </td>
+                        <td style="padding:9px 8px;text-align:right;border-left:2px solid #f1f5f9;">
+                            <span style="color:#4f46e5;font-weight:600">${fmt(r.catHall)}원</span>
+                            <span style="font-size:11px;color:#94a3b8;margin-left:3px">(${r.hallPct}%)</span>
+                        </td>
+                        <td style="padding:9px 8px;text-align:right;">
+                            ${hasTake
+                                ? `<span style="color:#10b981;font-weight:600">${fmt(r.catTake)}원</span><span style="font-size:11px;color:#94a3b8;margin-left:3px">(${r.takePct}%)</span>
+                                   <span style="font-size:10px;background:#dcfce7;color:#15803d;padding:1px 5px;border-radius:3px;margin-left:4px;">포장탭 중복</span>`
+                                : `<span style="color:#cbd5e1;font-size:12px">-</span>`}
+                        </td>
+                        <td style="padding:9px 8px;text-align:right;">
+                            ${hasDel
+                                ? `<span style="color:#ef4444;font-weight:600">${fmt(r.catDel)}원</span><span style="font-size:11px;color:#94a3b8;margin-left:3px">(${r.delPct}%)</span>
+                                   <span style="font-size:10px;background:#fee2e2;color:#b91c1c;padding:1px 5px;border-radius:3px;margin-left:4px;">배달탭 중복</span>`
+                                : `<span style="color:#cbd5e1;font-size:12px">-</span>`}
+                        </td>
+                        <td style="padding:9px 4px;">
+                            <div style="background:#f1f5f9;border-radius:4px;height:10px;overflow:hidden;">
+                                <div style="display:flex;height:100%;">
+                                    <div style="background:#4f46e5;width:${(r.catHall/maxSales*100).toFixed(1)}%;"></div>
+                                    <div style="background:#10b981;width:${(r.catTake/maxSales*100).toFixed(1)}%;"></div>
+                                    <div style="background:#ef4444;width:${(r.catDel/maxSales*100).toFixed(1)}%;"></div>
+                                </div>
+                            </div>
+                            <div style="display:flex;gap:4px;margin-top:3px;font-size:9px;color:#9ca3af;">
+                                <span style="color:#4f46e5">■홀</span><span style="color:#10b981">■포장</span><span style="color:#ef4444">■배달</span>
+                            </div>
+                        </td>
+                    </tr>`;
+                }).join('')}
+                <tr style="background:#1e293b;color:#fff;font-weight:700;">
+                    <td style="padding:9px 12px">합 계</td>
+                    <td style="padding:9px 8px;text-align:right">${catRows.reduce((s,r)=>s+r.count,0)}종</td>
+                    <td style="padding:9px 8px;text-align:right">${fmt(total)}원</td>
+                    <td style="padding:9px 8px;text-align:right">100%</td>
+                    <td style="padding:9px 8px;text-align:right;color:#a5b4fc">${fmt(hall)}원</td>
+                    <td style="padding:9px 8px;text-align:right;color:#6ee7b7">${fmt(take)}원</td>
+                    <td style="padding:9px 8px;text-align:right;color:#fca5a5">${fmt(del)}원</td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    `:'';
+
+    // 매장 비교 차트 (ALL 선택 + 2개 이상 매장일 때)
+    const stores = [...new Set(parsedBRaw.map(r=>r.store))].sort();
+    const comparePanel = document.getElementById('storeBComparePanel');
+    if(storeFilter === 'ALL' && stores.length > 1) {
+        comparePanel.style.display = '';
+        const storeTotals = stores.map(s => {
+            const rows = parsedBRaw.filter(r=>r.store===s);
+            return { store: s.replace('맛나감자탕 ',''), total: rows.reduce((sum,r)=>sum+r.net,0), del: rows.filter(r=>r.ch==='배달').reduce((sum,r)=>sum+r.net,0), hall: rows.filter(r=>r.ch!=='배달'&&r.ch!=='포장').reduce((sum,r)=>sum+r.net,0), take: rows.filter(r=>r.ch==='포장').reduce((sum,r)=>sum+r.net,0) };
+        });
+        if(chartBCompare) chartBCompare.destroy();
+        chartBCompare = new Chart(document.getElementById('cvBStoreCompare').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: storeTotals.map(s=>s.store),
+                datasets: [
+                    { label:'홀',  data: storeTotals.map(s=>s.hall), backgroundColor:'#4f46e5cc', borderRadius:3 },
+                    { label:'배달', data: storeTotals.map(s=>s.del),  backgroundColor:'#ef4444cc', borderRadius:3 },
+                    { label:'포장', data: storeTotals.map(s=>s.take), backgroundColor:'#10b981cc', borderRadius:3 },
+                ]
+            },
+            options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{position:'top'}, tooltip:{mode:'index',callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.raw)}원`}} }, scales:{ x:{stacked:true,grid:{display:false}}, y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(0)+'만'}} } }
+        });
+    } else {
+        comparePanel.style.display = 'none';
+    }
+}
+
+function setFilterB(m) { activeFilterB = m; document.querySelectorAll('#tabsFilterB .tab').forEach(t => t.classList.toggle('on', t.innerText === m)); renderBTable(); }
+
+function renderBTable() {
+    const totalSales = parsedB.reduce((s, x) => s + x.tn, 0);
+    let tableData = (activeFilterB === "전체") ? [...parsedB] : (activeFilterB === "배달") ? parsedB.filter(r => r.ch['배달'] > 0 || r.cat === '배달') : (activeFilterB === "포장") ? parsedB.filter(r => r.ch['포장'] > 0 || r.cat === '포장') : parsedB.filter(r => r.cat === activeFilterB);
+    const filterNet = tableData.reduce((s, r) => s + getNetByTab(r, activeFilterB), 0), filterQty = tableData.reduce((s, r) => s + r.tq, 0);
+    tableData.sort((a, b) => { let v1 = (sortStateB.col === 'tn') ? getNetByTab(a, activeFilterB) : a[sortStateB.col]; let v2 = (sortStateB.col === 'tn') ? getNetByTab(b, activeFilterB) : b[sortStateB.col]; return sortStateB.desc ? v2 - v1 : v1 - v2; });
+    const getI = (col) => sortStateB.col === col ? (sortStateB.desc ? '▼' : '▲') : '↕';
+
+    document.querySelector('#tblB thead').innerHTML = `<tr><th class="sortable" onclick="handleSortB('name')">상품명 ${sortStateB.col==='name'?getI('name'):''}</th><th>카테고리 분류</th><th class="num sortable" onclick="handleSortB('tq')">판매 수량 ${getI('tq')}</th><th class="num sortable" onclick="handleSortB('tn')">실매출액 ${getI('tn')}</th><th class="num">카테고리 비중</th><th class="num">전체 비중</th></tr>`;
+    document.querySelector('#tblB tbody').innerHTML = tableData.map(r => { const displayNet = getNetByTab(r, activeFilterB); if (displayNet === 0) return ''; return `<tr><td><strong>${r.name}</strong></td><td>${r.cat}</td><td class="num">${fmt(r.tq)}</td><td class="num" style="color:var(--primary-accent); font-weight:700;">${fmt(displayNet)}</td><td class="num"><span class="pct-box pct-cat">${((displayNet/filterNet)*100).toFixed(1)}%</span></td><td class="num"><span class="pct-box pct-total">${((displayNet/totalSales)*100).toFixed(1)}%</span></td></tr>`; }).join('');
+    document.getElementById('summaryBarB').innerHTML = `<span>활성 탭: <b>${activeFilterB}</b></span><div>합산 수량: <b>${fmt(filterQty)}개</b> | 총 실매출: <b>${fmt(filterNet)}원</b> | 전체 매출 대비: <b>${((filterNet/totalSales)*100).toFixed(1)}%</b></div>`;
+}
+
+function downloadExcelB() {
+    const totalSales = parsedB.reduce((s, x) => s + x.tn, 0);
+    let tableData = (activeFilterB === "전체") ? [...parsedB] : (activeFilterB === "배달") ? parsedB.filter(r => r.ch['배달'] > 0 || r.cat === '배달') : (activeFilterB === "포장") ? parsedB.filter(r => r.ch['포장'] > 0 || r.cat === '포장') : parsedB.filter(r => r.cat === activeFilterB);
+    const filterNet = tableData.reduce((s, r) => s + getNetByTab(r, activeFilterB), 0);
+    const data = tableData.filter(r => getNetByTab(r, activeFilterB) > 0).sort((a, b) => { let va = sortStateB.col === 'tn' ? getNetByTab(a, activeFilterB) : a[sortStateB.col]; let vb = sortStateB.col === 'tn' ? getNetByTab(b, activeFilterB) : b[sortStateB.col]; return sortStateB.desc ? vb - va : va - vb; })
+    .map((r, i) => { const net = getNetByTab(r, activeFilterB); return { "순위": i+1, "상품명": r.name, "카테고리": r.cat, "판매수량": r.tq, "실매출액": net, "카테고리내비중(%)": ((net/filterNet)*100).toFixed(1), "전체비중(%)": ((net/totalSales)*100).toFixed(1) }; });
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data); ws['!cols']=Object.keys(data[0]||{}).map(()=>({wch:16}));
+    XLSX.utils.book_append_sheet(wb, ws, `매출분석_${activeFilterB}`);
+
+    // 매장이 여러 개면 매장별 시트 추가
+    const stores = [...new Set(parsedBRaw.map(r=>r.store))].sort();
+    if(stores.length > 1) {
+        stores.forEach(store => {
+            const storeData = buildParsedB(store).sort((a,b)=>b.tn-a.tn).map((r,i)=>({ "순위":i+1, "상품명":r.name, "카테고리":r.cat, "판매수량":r.tq, "실매출액":r.tn, "홀":r.ch['일반 홀'], "티오더":r.ch['티오더(홀)'], "배달":r.ch['배달'], "포장":r.ch['포장'] }));
+            const ws2 = XLSX.utils.json_to_sheet(storeData);
+            const sheetName = store.replace('맛나감자탕 ','').substring(0,15);
+            XLSX.utils.book_append_sheet(wb, ws2, sheetName);
+        });
+    }
+    XLSX.writeFile(wb, `맛나감자탕_상세매출_${activeFilterB}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function copyForAIB() {
+    const totalSales = parsedB.reduce((s, x) => s + x.tn, 0);
+    let tableData = (activeFilterB === "전체") ? [...parsedB] : (activeFilterB === "배달") ? parsedB.filter(r => r.ch['배달'] > 0 || r.cat === '배달') : (activeFilterB === "포장") ? parsedB.filter(r => r.ch['포장'] > 0 || r.cat === '포장') : parsedB.filter(r => r.cat === activeFilterB);
+    const sorted = tableData.filter(r => getNetByTab(r, activeFilterB) > 0).sort((a, b) => getNetByTab(b, activeFilterB) - getNetByTab(a, activeFilterB));
+    let report = `[맛나감자탕 상품/메뉴 매출 데이터 요약 - 필터: ${activeFilterB}]\n\n`; report += sorted.slice(0, 30).map((r, i) => { const dNet = getNetByTab(r, activeFilterB); return `${i+1}위: ${r.name} (${r.cat}) - 판매수량: ${r.tq}개 / 매출액: ${fmt(dNet)}원 (전체대비 ${((dNet/totalSales)*100).toFixed(1)}%)`; }).join('\n'); report += `\n\n위 데이터를 분석하여 우리 매장의 객단가를 높이고 회전율을 개선할 수 있는 구체적인 메뉴 구성 및 프로모션 전략 3가지를 제안해줘.`; navigator.clipboard.writeText(report).then(() => alert("제미나이(AI) 질문 데이터가 복사되었습니다!"));
+}
+
+function resetB(){
+    parsedB=[]; parsedBRaw=[];
+    document.getElementById('upB').classList.remove('hidden');
+    document.getElementById('resB').classList.add('hidden');
+    document.getElementById('fiB').value='';
+    document.getElementById('storeBSelRow').style.display='none';
+    document.getElementById('menuSearchInput').value='';
+    document.getElementById('menuSearchResult').classList.add('hidden');
+    if(chartBCompare){chartBCompare.destroy();chartBCompare=null;}
+}
+
+function renderMenuSearch(keyword) {
+    const kw = keyword.replace(/\s/g,'').toLowerCase();
+    const panel = document.getElementById('menuSearchResult');
+    if(!kw) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    const matched = parsedB.filter(r=>r.name.replace(/\s/g,'').toLowerCase().includes(kw));
+    const totalAll = parsedB.reduce((s,r)=>s+r.tn,0)||1;
+    const totalMatched = matched.reduce((s,r)=>s+r.tn,0);
+    const totalQty = matched.reduce((s,r)=>s+r.tq,0);
+    const totalDel = matched.reduce((s,r)=>s+(r.ch['배달']||0),0);
+    const totalTake= matched.reduce((s,r)=>s+(r.ch['포장']||0),0);
+    document.getElementById('menuSearchTitle').innerHTML=`<i class="ti ti-search"></i> "<b>${keyword}</b>" 검색 결과 — ${matched.length}개 메뉴`;
+    document.getElementById('menuSearchMets').innerHTML=matched.length?`
+        <div class="mc"><div class="mc-l">검색 매출 합계</div><div class="mc-v">${fmt(totalMatched)}원</div></div>
+        <div class="mc"><div class="mc-l">전체 대비 비중</div><div class="mc-v">${(totalMatched/totalAll*100).toFixed(1)}%</div></div>
+        <div class="mc"><div class="mc-l">총 판매 수량</div><div class="mc-v">${fmt(totalQty)}개</div></div>
+        <div class="mc" style="border-left-color:var(--primary-accent)"><div class="mc-l">홀 매출</div><div class="mc-v">${fmt(totalMatched-totalDel-totalTake)}원</div></div>
+        <div class="mc" style="border-left-color:#ef4444"><div class="mc-l">배달 매출</div><div class="mc-v" style="color:#ef4444">${fmt(totalDel)}원</div></div>
+        <div class="mc" style="border-left-color:#10b981"><div class="mc-l">포장 매출</div><div class="mc-v" style="color:#10b981">${fmt(totalTake)}원</div></div>
+    `:'';
+    const tbl=document.getElementById('tblSearch');
+    if(!matched.length){tbl.querySelector('thead').innerHTML='';tbl.querySelector('tbody').innerHTML=`<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:24px">"${keyword}"에 해당하는 메뉴가 없습니다.</td></tr>`;return;}
+    const re=new RegExp('('+keyword.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+    tbl.querySelector('thead').innerHTML=`<tr><th>순위</th><th>상품명</th><th>카테고리</th><th class="num">판매수량</th><th class="num">실매출액</th><th class="num">홀</th><th class="num">배달</th><th class="num">포장</th><th class="num">전체비중</th></tr>`;
+    tbl.querySelector('tbody').innerHTML=matched.sort((a,b)=>b.tn-a.tn).map((r,i)=>{
+        const hall=r.tn-(r.ch['배달']||0)-(r.ch['포장']||0);
+        const hlName=r.name.replace(re,'<mark style="background:#fef08a;border-radius:2px;padding:0 2px">$1</mark>');
+        return`<tr><td style="font-weight:700;color:#64748b">${i+1}</td><td><strong>${hlName}</strong></td><td><span style="font-size:11px;background:#f1f5f9;padding:2px 7px;border-radius:4px">${r.cat}</span></td><td class="num">${fmt(r.tq)}</td><td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(r.tn)}원</td><td class="num">${fmt(hall)}원</td><td class="num" style="color:#ef4444">${fmt(r.ch['배달']||0)}원</td><td class="num" style="color:#10b981">${fmt(r.ch['포장']||0)}원</td><td class="num"><span class="pct-box pct-total">${(r.tn/totalAll*100).toFixed(1)}%</span></td></tr>`;
+    }).join('');
+}
+
+// ==========================================
+// SECTION C : 단독 매장 종합 경영 리포트 V11
+// ==========================================
+let chartCDaily=null, chartCCategory=null;
+let chartCMonthly=null, chartCMonthlyTotal=null;
+let chartCWeekdayMenu=null, chartCWeekdayTotal=null;
+let chartCDailyMenu=null, chartCHourlyMenu=null;
+let chartABC=null, chartOpportunity=null;
+let excelDataW=[], excelDataT=[], curTopMenus=[];
+let _cDataA=[], _cSortedB=[], _cTotalA=0, _cWeights=null;
+let curCTab='overview';
+const CC=['#4f46e5','#10b981','#f59e0b','#ef4444','#8b5cf6','#0ea5e9','#f97316','#64748b','#ec4899','#14b8a6'];
+
+function switchCTab(name, btn) {
+    curCTab = name;
+    document.querySelectorAll('#tabsC .tab').forEach(t => t.classList.remove('on'));
+    if(btn) btn.classList.add('on');
+    ['overview','monthly','weekday','daily','hourly','catrank','signal','strategy'].forEach(t => {
+        document.getElementById('cpanel_'+t).classList.toggle('hidden', t!==name);
+    });
+    if(name==='monthly') renderCMonthly();
+    else if(name==='weekday') renderCWeekday();
+    else if(name==='daily') renderCDailyMenu();
+    else if(name==='hourly') renderCHourly();
+    else if(name==='catrank') renderCCatRank();
+    else if(name==='signal') renderCSignal();
+    else if(name==='strategy') renderCStrategy();
+}
+
+function calcWeights(dataA, totalA) {
+    const safe = totalA || 1;
+    const dayAgg={'일':0,'월':0,'화':0,'수':0,'목':0,'금':0,'토':0};
+    const segAgg={morning:0,lunch:0,extra:0,dinner:0,night:0};
+    const hourAgg={}, monthAgg={}, dateAgg={};
+    HOURS.forEach(h=>hourAgg[h]=0);
+    dataA.forEach(r=>{
+        const amt = r.slots['합계']?.amt||0;
+        dayAgg[r.day] = (dayAgg[r.day]||0) + amt;
+        // 월 키 추출: "MM-DD" → "MM월", "YYYY-MM-DD" → "MM월"
+        const parts = r.date.split('-');
+        const mKey = (parts.length===2 ? parts[0] : parts.length===3 ? parts[1] : r.date.substring(0,2)) + '월';
+        monthAgg[mKey] = (monthAgg[mKey]||0) + amt;
+        dateAgg[r.date] = (dateAgg[r.date]||0) + amt;
+        HOURS.forEach(h=>{ const sk=getSegKey(h); if(sk) segAgg[sk]+=(r.slots[h]?.amt||0); hourAgg[h]+=(r.slots[h]?.amt||0); });
+    });
+    const dayW={}, segW={}, hourW={}, monthW={}, dateW={};
+    DAY_ORDER.forEach(d=>dayW[d]=dayAgg[d]/safe);
+    SEGS.forEach(s=>segW[s.key]=segAgg[s.key]/safe);
+    HOURS.forEach(h=>hourW[h]=hourAgg[h]/safe);
+    Object.keys(monthAgg).forEach(k=>monthW[k]=monthAgg[k]/safe);
+    Object.keys(dateAgg).forEach(k=>dateW[k]=dateAgg[k]/safe);
+    return {dayAgg,segAgg,hourAgg,monthAgg,dateAgg,dayW,segW,hourW,monthW,dateW};
+}
+
+function checkAndRenderC() {
+    const isA=parsedA&&parsedA.length>0;
+    // parsedBRaw가 있으면 우선 사용, 없으면 기존 parsedB 체크
+    const isB=(parsedBRaw&&parsedBRaw.length>0)||(parsedB&&parsedB.length>0);
+    // parsedBRaw가 없는데 parsedB가 있는 구버전 호환: rawList 구성
+    if(parsedB&&parsedB.length>0&&(!parsedBRaw||parsedBRaw.length===0)){
+        parsedBRaw=parsedB.map(r=>({store:'전체',name:r.name,cat:r.cat,tq:r.tq,net:r.tn,ch:'일반 홀'}));
+        parsedB.forEach(r=>{
+            ['일반 홀','티오더(홀)','배달','포장'].forEach(ch=>{ if(r.ch[ch]) parsedBRaw.push({store:'전체',name:r.name,cat:r.cat,tq:0,net:r.ch[ch],ch}); });
+        });
+    }
+    if(!isA||!isB){document.getElementById('promptC').style.display='block'; document.getElementById('resC').classList.add('hidden'); return;}
+    document.getElementById('promptC').style.display='none'; document.getElementById('resC').classList.remove('hidden');
+
+    // A데이터 매장 목록
+    const storesA=[...new Set(parsedA.map(r=>r.store))].sort();
+    const selA=document.getElementById('storeSelC'), prevA=selA.value;
+    selA.innerHTML=''; storesA.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s.replace('맛나감자탕 ','');selA.appendChild(o);});
+    if(prevA&&storesA.includes(prevA)) selA.value=prevA;
+    selA.onchange=renderC;
+
+    // B데이터 매장 목록
+    const storesB=[...new Set(parsedBRaw.map(r=>r.store))].sort();
+    const selB=document.getElementById('storeSelCB'), prevB=selB.value;
+    const rowB=document.getElementById('storeCBRow');
+    selB.innerHTML='';
+    if(storesB.length>1){
+        selB.innerHTML='<option value="ALL">전체 합산</option>';
+        storesB.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s.replace('맛나감자탕 ','');selB.appendChild(o);});
+        // A에서 선택한 매장과 같은 이름 자동 매핑
+        const curA=selA.value;
+        if(prevB&&storesB.includes(prevB)) selB.value=prevB;
+        else if(storesB.includes(curA)) selB.value=curA;
+        rowB.style.display='flex';
+    } else {
+        // B매장이 1개면 숨기고 그냥 전체 사용
+        rowB.style.display='none';
+        if(storesB.length===1){ selB.innerHTML=''; const o=document.createElement('option'); o.value=storesB[0]; o.textContent=storesB[0].replace('맛나감자탕 ',''); selB.appendChild(o); }
+    }
+
+    renderC();
+}
+
+function renderC() {
+    const storeA=document.getElementById('storeSelC').value;
+    const storeB=document.getElementById('storeSelCB')?.value||'ALL';
+
+    _cDataA=parsedA.filter(r=>r.store===storeA);
+    _cTotalA=0; _cDataA.forEach(r=>_cTotalA+=(r.slots['합계']?.amt||0));
+    const dates=[...new Set(_cDataA.map(r=>r.date))].sort();
+    const avgDaily=dates.length>0?_cTotalA/dates.length:0;
+
+    // B데이터: 선택 매장 기준으로 재집계
+    parsedB = buildParsedB(storeB);
+    const totalB=parsedB.reduce((s,r)=>s+r.tn,0);
+    _cSortedB=[...parsedB].sort((a,b)=>b.tn-a.tn);
+    _cWeights=calcWeights(_cDataA,_cTotalA);
+    curTopMenus=_cSortedB.slice(0,7);
+
+    // 기간 + 매장 표시
+    const storeBLabel = storeB==='ALL' ? '전체합산' : storeB.replace('맛나감자탕','');
+    if(dates.length>0) document.getElementById('periodDisplayC').innerHTML=
+        `<i class="ti ti-building-store"></i> ${storeA.replace('맛나감자탕','')} (A) · ${storeBLabel} (B) · ${dates[0]} ~ ${dates[dates.length-1]}`;
+
+    // KPI — 홀/배달/포장 채널도 표시
+    const delB=parsedB.reduce((s,r)=>s+r.ch['배달'],0);
+    const takeB=parsedB.reduce((s,r)=>s+r.ch['포장'],0);
+    const hallB=totalB-delB-takeB;
+    document.getElementById('metsC').innerHTML=`
+        <div class="mc"><div class="mc-l">기간 총 매출 (A)</div><div class="mc-v">${fmt(_cTotalA)}원</div></div>
+        <div class="mc"><div class="mc-l">일평균 매출</div><div class="mc-v">${fmt(avgDaily)}원</div></div>
+        <div class="mc" style="border-left-color:var(--primary-accent)"><div class="mc-l">홀 매출</div><div class="mc-v">${fmt(hallB)}원 <span style="font-size:12px;color:#64748b">(${totalB>0?((hallB/totalB)*100).toFixed(1):0}%)</span></div></div>
+        <div class="mc" style="border-left-color:#ef4444"><div class="mc-l">배달 매출</div><div class="mc-v" style="color:#ef4444">${fmt(delB)}원 <span style="font-size:12px;color:#ef4444;opacity:.8">(${totalB>0?((delB/totalB)*100).toFixed(1):0}%)</span></div></div>
+        <div class="mc" style="border-left-color:#10b981"><div class="mc-l">포장 매출</div><div class="mc-v" style="color:#10b981">${fmt(takeB)}원 <span style="font-size:12px;color:#10b981;opacity:.8">(${totalB>0?((takeB/totalB)*100).toFixed(1):0}%)</span></div></div>
+        <div class="mc" style="border-left-color:#8b5cf6"><div class="mc-l">베스트 메뉴</div><div class="mc-v" style="font-size:13px;color:#7c3aed">${_cSortedB[0]?.name||'-'}</div></div>
+    `;
+
+    // 개요 차트1: 일자별 매출
+    const aggA={}; _cDataA.forEach(r=>{if(!aggA[r.date])aggA[r.date]=0; aggA[r.date]+=(r.slots['합계']?.amt||0);});
+    const dL=Object.keys(aggA).sort();
+    if(chartCDaily) chartCDaily.destroy();
+    chartCDaily=new Chart(document.getElementById('cvCDaily').getContext('2d'),{type:'line',data:{labels:dL,datasets:[{label:'일자별 매출',data:dL.map(d=>aggA[d]),borderColor:'#4f46e5',backgroundColor:'rgba(79,70,229,0.08)',fill:true,tension:0.2,pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}},x:{ticks:{maxTicksLimit:10},grid:{display:false}}}}});
+
+    // 개요 차트2: 카테고리 도넛
+    const catMap={}; parsedB.forEach(r=>{if(r.cat==='전체'||r.cat==='기타')return; catMap[r.cat]=(catMap[r.cat]||0)+r.tn;});
+    const catL=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]).slice(0,6);
+    if(chartCCategory) chartCCategory.destroy();
+    chartCCategory=new Chart(document.getElementById('cvCCategory').getContext('2d'),{type:'doughnut',data:{labels:catL,datasets:[{data:catL.map(l=>catMap[l]),backgroundColor:CC}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right'}},cutout:'65%'}});
+
+    // 개요 TOP 10 표
+    document.querySelector('#tblC_Top thead').innerHTML=`<tr><th>순위</th><th>상품명</th><th>카테고리</th><th class="num">판매수량</th><th class="num">실매출액</th><th class="num">매출비중</th></tr>`;
+    document.querySelector('#tblC_Top tbody').innerHTML=_cSortedB.slice(0,10).map((r,i)=>`<tr><td style="font-weight:700;color:#475569">${i+1}위</td><td><strong>${r.name}</strong></td><td>${r.cat}</td><td class="num">${fmt(r.tq)}</td><td class="num" style="color:var(--primary-accent);font-weight:700">${fmt(r.tn)}</td><td class="num"><span class="pct-box pct-total">${((r.tn/totalB)*100).toFixed(1)}%</span></td></tr>`).join('');
+
+    // 개요 요일별 표
+    const W=_cWeights;
+    let hwH='<tr><th>요일</th>'; curTopMenus.forEach(m=>hwH+=`<th class="num" style="font-size:11px">${m.name}</th>`);
+    document.querySelector('#tblC_Weekday thead').innerHTML=hwH+'</tr>';
+    excelDataW=[];
+    document.querySelector('#tblC_Weekday tbody').innerHTML=DAY_ORDER.filter(d=>W.dayAgg[d]>0).map(d=>{
+        const er={"요일":d+"요일"}; const cells=curTopMenus.map(m=>{const v=Math.round(m.tn*W.dayW[d]); er[m.name]=v; return`<td class="num">${fmt(v)}</td>`;}).join('');
+        excelDataW.push(er); return`<tr><td style="font-weight:700;background:#f8fafc">${d}요일</td>${cells}</tr>`;
+    }).join('');
+
+    // 개요 시간대별 표
+    let htH='<tr><th>시간대</th>'; curTopMenus.forEach(m=>htH+=`<th class="num" style="font-size:11px">${m.name}</th>`);
+    document.querySelector('#tblC_Hour thead').innerHTML=htH+'</tr>';
+    excelDataT=[];
+    document.querySelector('#tblC_Hour tbody').innerHTML=SEGS.filter(s=>W.segAgg[s.key]>0).map(seg=>{
+        const er={"시간대":seg.name}; const cells=curTopMenus.map(m=>{const v=Math.round(m.tn*W.segW[seg.key]); er[m.name]=v; return`<td class="num">${fmt(v)}</td>`;}).join('');
+        excelDataT.push(er); return`<tr><td style="font-weight:700;background:#f8fafc">${seg.name}</td>${cells}</tr>`;
+    }).join('');
+
+    // 현재 탭이 overview가 아니면 해당 탭 재렌더
+    if(curCTab==='monthly') renderCMonthly();
+    else if(curCTab==='weekday') renderCWeekday();
+    else if(curCTab==='daily') renderCDailyMenu();
+    else if(curCTab==='hourly') renderCHourly();
+    else if(curCTab==='catrank') renderCCatRank();
+    else if(curCTab==='signal') renderCSignal();
+    else if(curCTab==='strategy') renderCStrategy();
+}
+
+// ── 월별 메뉴 경향 ─────────────────────────────
+function renderCMonthly() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const n=parseInt(document.getElementById('monthlyN').value)||7;
+    const W=_cWeights, months=Object.keys(W.monthAgg).sort(), tops=_cSortedB.slice(0,n);
+
+    if(chartCMonthlyTotal) chartCMonthlyTotal.destroy();
+    chartCMonthlyTotal=new Chart(document.getElementById('cvCMonthlyTotal').getContext('2d'),{type:'bar',data:{labels:months,datasets:[{label:'월별 총매출',data:months.map(m=>W.monthAgg[m]),backgroundColor:CC.map(c=>c+'bb'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}},x:{grid:{display:false}}}}});
+
+    if(chartCMonthly) chartCMonthly.destroy();
+    chartCMonthly=new Chart(document.getElementById('cvCMonthly').getContext('2d'),{type:'bar',data:{labels:months,datasets:tops.map((m,i)=>({label:m.name,data:months.map(mo=>Math.round(m.tn*W.monthW[mo])),backgroundColor:CC[i%CC.length]+'cc',borderRadius:2}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(0)+'만'}}}}});
+
+    let th='<tr><th>월</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">월합계</th></tr>';
+    document.querySelector('#tblC_Monthly thead').innerHTML=th;
+    document.querySelector('#tblC_Monthly tbody').innerHTML=months.map(mo=>{
+        const vals=tops.map(m=>Math.round(m.tn*W.monthW[mo]));
+        return`<tr><td style="font-weight:700;background:#f8fafc">${mo}</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(vals.reduce((s,v)=>s+v,0))}</td></tr>`;
+    }).join('');
+}
+
+// ── 요일별 메뉴 경향 ─────────────────────────────
+function renderCWeekday() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const n=parseInt(document.getElementById('weekdayN').value)||7;
+    const W=_cWeights, actDays=DAY_ORDER.filter(d=>W.dayAgg[d]>0), tops=_cSortedB.slice(0,n);
+
+    if(chartCWeekdayTotal) chartCWeekdayTotal.destroy();
+    chartCWeekdayTotal=new Chart(document.getElementById('cvCWeekdayTotal').getContext('2d'),{type:'bar',data:{labels:actDays.map(d=>d+'요일'),datasets:[{label:'요일별 총매출',data:actDays.map(d=>W.dayAgg[d]),backgroundColor:CC.map(c=>c+'aa'),borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}},x:{grid:{display:false}}}}});
+
+    if(chartCWeekdayMenu) chartCWeekdayMenu.destroy();
+    chartCWeekdayMenu=new Chart(document.getElementById('cvCWeekdayMenu').getContext('2d'),{type:'bar',data:{labels:actDays.map(d=>d+'요일'),datasets:tops.map((m,i)=>({label:m.name,data:actDays.map(d=>Math.round(m.tn*W.dayW[d])),backgroundColor:CC[i%CC.length]+'cc',borderRadius:3}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{grid:{display:false}},y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}}}}});
+
+    let th='<tr><th>요일</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">합계</th></tr>';
+    document.querySelector('#tblC_WeekdayDetail thead').innerHTML=th;
+    document.querySelector('#tblC_WeekdayDetail tbody').innerHTML=actDays.map(d=>{
+        const vals=tops.map(m=>Math.round(m.tn*W.dayW[d]));
+        return`<tr><td style="font-weight:700;background:#f8fafc">${d}요일</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(vals.reduce((s,v)=>s+v,0))}</td></tr>`;
+    }).join('');
+}
+
+// ── 일별 메뉴 경향 ─────────────────────────────
+function renderCDailyMenu() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const n=parseInt(document.getElementById('dailyN').value)||5;
+    const W=_cWeights, dates=Object.keys(W.dateAgg).sort().slice(-30), tops=_cSortedB.slice(0,n);
+
+    if(chartCDailyMenu) chartCDailyMenu.destroy();
+    chartCDailyMenu=new Chart(document.getElementById('cvCDailyMenu').getContext('2d'),{type:'line',data:{labels:dates,datasets:tops.map((m,i)=>({label:m.name,data:dates.map(d=>Math.round(m.tn*(W.dateW[d]||0))),borderColor:CC[i%CC.length],borderWidth:2,fill:false,tension:0.2,pointRadius:2}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{ticks:{maxTicksLimit:15},grid:{display:false}},y:{ticks:{callback:v=>(v/10000).toFixed(1)+'만'}}}}});
+
+    let th='<tr><th>날짜(요일)</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">일합계</th></tr>';
+    document.querySelector('#tblC_Daily thead').innerHTML=th;
+    document.querySelector('#tblC_Daily tbody').innerHTML=dates.map(d=>{
+        const info=_cDataA.find(r=>r.date===d), vals=tops.map(m=>Math.round(m.tn*(W.dateW[d]||0)));
+        return`<tr><td style="font-weight:700;background:#f8fafc">${d}${info?'('+info.day+')':''}</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700;color:var(--primary-accent)">${fmt(vals.reduce((s,v)=>s+v,0))}</td></tr>`;
+    }).join('');
+}
+
+// ── 시간별 메뉴 경향 ─────────────────────────────
+function renderCHourly() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const n=parseInt(document.getElementById('hourlyN').value)||7;
+    const W=_cWeights, actH=HOURS.filter(h=>W.hourAgg[h]>0), tops=_cSortedB.slice(0,n);
+
+    if(chartCHourlyMenu) chartCHourlyMenu.destroy();
+    chartCHourlyMenu=new Chart(document.getElementById('cvCHourlyMenu').getContext('2d'),{type:'bar',data:{labels:actH.map(h=>h+'시'),datasets:tops.map((m,i)=>({label:m.name,data:actH.map(h=>Math.round(m.tn*W.hourW[h])),backgroundColor:CC[i%CC.length]+'cc',borderRadius:2}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},tooltip:{mode:'index'}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,ticks:{callback:v=>(v/10000).toFixed(1)+'만'}}}}});
+
+    const totalHour=actH.reduce((s,h)=>s+W.hourAgg[h],0)||1;
+    document.getElementById('segMenuGrid').innerHTML=SEGS.map(seg=>{
+        const segTotal=seg.hours.reduce((s,h)=>s+(W.hourAgg[h]||0),0);
+        if(!segTotal) return'';
+        const pct=(segTotal/totalHour*100).toFixed(1);
+        const topInSeg=[...tops].sort((a,b)=>(b.tn*W.segW[seg.key])-(a.tn*W.segW[seg.key]));
+        return`<div style="background:${seg.color}15;border:1.5px solid ${seg.color}44;border-radius:10px;padding:14px;">
+            <div style="font-weight:700;color:${seg.color};margin-bottom:6px;font-size:13px">${seg.name} <span style="font-size:11px;opacity:.8">(${seg.range}) · ${pct}%</span></div>
+            ${topInSeg.slice(0,3).map((m,i)=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid ${seg.color}22;font-size:12px"><span>${i+1}. ${m.name}</span><span style="font-weight:700">${fmt(m.tn*W.segW[seg.key])}원</span></div>`).join('')}
+        </div>`;
+    }).join('');
+
+    let th='<tr><th>시간</th><th>운영구간</th>'; tops.forEach(m=>th+=`<th class="num" style="font-size:11px">${m.name}</th>`); th+='<th class="num">시간합계</th></tr>';
+    document.querySelector('#tblC_HourlyDetail thead').innerHTML=th;
+    document.querySelector('#tblC_HourlyDetail tbody').innerHTML=actH.map(h=>{
+        const seg=SEGS.find(s=>s.key===getSegKey(h)), vals=tops.map(m=>Math.round(m.tn*W.hourW[h]));
+        return`<tr><td style="font-weight:700;background:#f8fafc">${h}시</td><td style="font-size:11px;color:${seg?seg.color:'#888'}">${seg?seg.name:'-'}</td>${vals.map(v=>`<td class="num">${fmt(v)}</td>`).join('')}<td class="num" style="font-weight:700">${fmt(W.hourAgg[h])}</td></tr>`;
+    }).join('');
+}
+
+// ── 카테고리별 TOP 10 ─────────────────────────────
+let chartCatCompare = null;
+function renderCCatRank() {
+    if(!_cSortedB.length) return;
+    const cats = ['감자탕','뼈찜','뼈구이','간장뼈찜','식사'];
+    const totalB = parsedB.reduce((s,r)=>s+r.tn,0)||1;
+    const catTotals = {};
+
+    cats.forEach(cat => {
+        const items = parsedB.filter(r=>r.cat===cat).sort((a,b)=>b.tn-a.tn);
+        catTotals[cat] = items.reduce((s,r)=>s+r.tn,0);
+        const catTotal = catTotals[cat]||1;
+        const el = document.getElementById('tblCat_'+cat);
+        if(!el) return;
+        el.querySelector('thead').innerHTML = `<tr><th>순위</th><th>상품명</th><th class="num">판매수량</th><th class="num">매출액</th><th class="num">카테고리비중</th><th class="num">전체비중</th></tr>`;
+        el.querySelector('tbody').innerHTML = items.slice(0,10).map((r,i)=>{
+            const rankColor = i===0?'#f59e0b':i===1?'#9ca3af':i===2?'#b45309':'#475569';
+            return `<tr>
+                <td style="font-weight:800;color:${rankColor};font-size:15px">${i+1}</td>
+                <td><strong>${r.name}</strong></td>
+                <td class="num">${fmt(r.tq)}</td>
+                <td class="num" style="color:var(--primary-accent);font-weight:700">${fmt(r.tn)}원</td>
+                <td class="num"><span class="pct-box pct-cat">${((r.tn/catTotal)*100).toFixed(1)}%</span></td>
+                <td class="num"><span class="pct-box pct-total">${((r.tn/totalB)*100).toFixed(1)}%</span></td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:20px">해당 카테고리 데이터 없음</td></tr>';
+    });
+
+    // 카테고리 비교 바차트
+    if(chartCatCompare) chartCatCompare.destroy();
+    const catColors = {'감자탕':'#4f46e5','뼈찜':'#ef4444','뼈구이':'#f97316','간장뼈찜':'#10b981','식사':'#0ea5e9'};
+    chartCatCompare = new Chart(document.getElementById('cvCatCompare').getContext('2d'),{
+        type:'bar',
+        data:{
+            labels:cats,
+            datasets:[{
+                label:'카테고리 총매출',
+                data:cats.map(c=>catTotals[c]||0),
+                backgroundColor:cats.map(c=>catColors[c]+'cc'),
+                borderRadius:6
+            }]
+        },
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmt(c.raw)}원 (전체의 ${((c.raw/totalB)*100).toFixed(1)}%)`}}},scales:{y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}},x:{grid:{display:false}}}}
+    });
+}
+
+// ── 판매 이상 감지 — 카테고리 합산 기반 변화량·변화율 ─────────────
+let _sigCat = '감자탕';
+
+function getCatSales(cat) {
+    if(cat === '배달') return parsedB.reduce((s,r)=>s+(r.ch['배달']||0),0);
+    return parsedB.filter(r=>r.cat===cat).reduce((s,r)=>s+r.tn,0);
+}
+
+function sigTable(elId, rows) {
+    const el = document.getElementById(elId);
+    if(!el) return;
+    if(!rows.length) {
+        el.querySelector('thead').innerHTML='';
+        el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:20px">데이터가 부족합니다 (2개 이상 기간 필요)</td></tr>';
+        return;
+    }
+    el.querySelector('thead').innerHTML=`<tr>
+        <th>순위</th><th>기간</th>
+        <th class="num">추정 매출</th>
+        <th class="num">평균 매출</th>
+        <th class="num">변화량 (Δ)</th>
+        <th class="num">변화율</th>
+    </tr>`;
+    el.querySelector('tbody').innerHTML = rows.map((r,i)=>{
+        const sign = r.delta>=0?'+':'';
+        const dColor = r.delta>=0?'#059669':'#dc2626';
+        const rColor = r.rate>=0?'#059669':'#dc2626';
+        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+        const bg = i<3?'background:#fffbeb;':'';
+        return `<tr style="${bg}">
+            <td style="font-weight:700;color:#64748b;font-size:13px">${medal||i+1}</td>
+            <td style="font-weight:700">${r.label}</td>
+            <td class="num">${fmt(r.val)}원</td>
+            <td class="num" style="color:#64748b">${fmt(r.avg)}원</td>
+            <td class="num" style="font-weight:700;color:${dColor}">${sign}${fmt(r.delta)}원</td>
+            <td class="num"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-weight:700;font-size:12px;background:${r.rate>=0?'#dcfce7':'#fee2e2'};color:${rColor}">${sign}${r.rate.toFixed(1)}%</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function switchSigCat(cat, btn) {
+    _sigCat = cat;
+    document.querySelectorAll('#sigCatTabs .tab').forEach(t=>t.classList.remove('on'));
+    if(btn) btn.classList.add('on');
+    const lbl = document.getElementById('sigCatLabel');
+    if(lbl) lbl.textContent = `현재 카테고리: ${cat} (카테고리 합산 기준)`;
+    renderSigTables(cat);
+}
+
+function renderSigTables(cat) {
+    if(!_cWeights) return;
+    const W = _cWeights;
+    const total = getCatSales(cat);
+    const noData = `<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">${cat} 카테고리 매출 데이터 없음</td></tr>`;
+
+    if(!total) {
+        ['tblSigDaily','tblSigWeekday','tblSigMonth'].forEach(id=>{
+            const el=document.getElementById(id); if(!el) return;
+            el.querySelector('thead').innerHTML='';
+            el.querySelector('tbody').innerHTML=noData;
+        });
+        return;
+    }
+
+    // [1] 일별
+    const allDates = Object.keys(W.dateAgg).sort();
+    if(allDates.length >= 2) {
+        const dailyVals = allDates.map(d => total * (W.dateW[d]||0));
+        const avg = dailyVals.reduce((s,v)=>s+v,0) / dailyVals.length || 1;
+        const rows = allDates.map((d,i) => {
+            const val = dailyVals[i];
+            const delta = val - avg;
+            const rate = (delta/avg)*100;
+            const dayInfo = _cDataA.find(r=>r.date===d);
+            const label = d + (dayInfo?`(${dayInfo.day})`:'');
+            return { label, val, avg, delta, rate };
+        })
+        .filter(r => Math.abs(r.rate) > 5)
+        .sort((a,b) => b.rate - a.rate)
+        .slice(0, 20);
+        sigTable('tblSigDaily', rows);
+    } else {
+        const el=document.getElementById('tblSigDaily');
+        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">3일 이상 데이터가 필요합니다</td></tr>'; }
+    }
+
+    // [2] 요일별
+    const activeDays = DAY_ORDER.filter(d=>W.dayAgg[d]>0);
+    if(activeDays.length >= 2) {
+        const dayVals = activeDays.map(d => total * (W.dayW[d]||0));
+        const avg = dayVals.reduce((s,v)=>s+v,0) / dayVals.length || 1;
+        const rows = activeDays.map((d,i) => {
+            const val = dayVals[i];
+            const delta = val - avg;
+            const rate = (delta/avg)*100;
+            return { label: d+'요일', val, avg, delta, rate };
+        }).sort((a,b) => b.rate - a.rate).slice(0,20);
+        sigTable('tblSigWeekday', rows);
+    } else {
+        const el=document.getElementById('tblSigWeekday');
+        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">2개 이상 요일 데이터가 필요합니다</td></tr>'; }
+    }
+
+    // [3] 월별
+    const activeMonths = Object.keys(W.monthAgg).filter(k=>W.monthAgg[k]>0).sort();
+    if(activeMonths.length >= 2) {
+        const monthVals = activeMonths.map(mo => total * (W.monthW[mo]||0));
+        const avg = monthVals.reduce((s,v)=>s+v,0) / monthVals.length || 1;
+        const rows = activeMonths.map((mo,i) => {
+            const val = monthVals[i];
+            const delta = val - avg;
+            const rate = (delta/avg)*100;
+            return { label: mo, val, avg, delta, rate };
+        }).sort((a,b) => b.rate - a.rate).slice(0,20);
+        sigTable('tblSigMonth', rows);
+    } else {
+        const el=document.getElementById('tblSigMonth');
+        if(el){ el.querySelector('thead').innerHTML=''; el.querySelector('tbody').innerHTML='<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:16px">2개월 이상 데이터가 필요합니다</td></tr>'; }
+    }
+}
+
+function renderCSignal() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const lbl = document.getElementById('sigCatLabel');
+    if(lbl) lbl.textContent = `현재 카테고리: ${_sigCat} (카테고리 합산 기준)`;
+    renderSigTables(_sigCat);
+
+    const W = _cWeights;
+    const activeDays = DAY_ORDER.filter(d=>W.dayAgg[d]>0);
+    const peakDay = activeDays.length ? activeDays.reduce((a,b)=>W.dayAgg[b]>W.dayAgg[a]?b:a) : '-';
+    const lowDay  = activeDays.length ? activeDays.reduce((a,b)=>W.dayAgg[b]<W.dayAgg[a]?b:a) : '-';
+    document.getElementById('signalAdvice').innerHTML = `
+        <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">① 변화율 활용 — 식재료 발주 최적화</span>
+        <div style="color:#cbd5e1;margin-top:4px">변화율 +20% 이상인 날짜·요일이 반복된다면 해당 카테고리 식재료를 <b>그 전날 15~25% 추가 발주</b>하세요. -20% 이하 날짜는 발주를 줄여 원가를 절감하세요.</div></div>
+        <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">② 피크/비피크 요일 전략 분리</span>
+        <div style="color:#cbd5e1;margin-top:4px">피크 요일 <b style="color:#fbbf24">${peakDay}요일</b>은 인력 강화·강세 카테고리 준비, 비피크 요일 <b style="color:#f87171">${lowDay}요일</b>은 <b>타임세일·SNS 이벤트</b>로 매출 편차를 줄이세요.</div></div>
+        <div style="margin-bottom:14px"><span style="font-size:15px;font-weight:700;color:#93c5fd">③ 배달 채널 이상 감지 활용</span>
+        <div style="color:#cbd5e1;margin-top:4px">배달 탭의 변화율이 높은 날짜는 날씨·이벤트 등 외부 요인과 연관될 수 있습니다. 패턴을 메모해 <b>배달 프로모션 타이밍</b>을 잡는 데 활용하세요.</div></div>
+        <div><span style="font-size:15px;font-weight:700;color:#93c5fd">④ 카테고리 교차 분석</span>
+        <div style="color:#cbd5e1;margin-top:4px">감자탕 강세 날에 뼈찜이 약세인 패턴 등을 비교하면 <b>카테고리 간 대체재 관계</b>를 파악할 수 있어 메뉴 구성 전략에 활용하세요.</div></div>
+    `;
+}
+
+// 구버전 호환용 더미
+function getMenusByCat(cat){ return cat==='배달'?parsedB.filter(r=>r.ch['배달']>0):parsedB.filter(r=>r.cat===cat); }
+function zScore(values){ const n=values.length; if(n<2)return values.map(()=>0); const mean=values.reduce((s,v)=>s+v,0)/n; const std=Math.sqrt(values.reduce((s,v)=>s+(v-mean)**2,0)/n)||1; return values.map(v=>(v-mean)/std); }
+function sigCard(){return '';}
+function switchSigTab(id,btn){}
+function renderSigDaily(cat,btn){}
+function renderSigWeekday(cat,btn){}
+function renderSigMonth(cat,btn){}
+function renderSigMenuTop(cat,btn){}
+
+
+// ── 경영전략 분석 ─────────────────────────────
+function renderCStrategy() {
+    if(!_cDataA.length||!_cSortedB.length||!_cWeights) return;
+    const W=_cWeights;
+    const totalB=parsedB.reduce((s,r)=>s+r.tn,0)||1;
+
+    // ABC 분석
+    let cum=0;
+    const abcData=_cSortedB.map(m=>{cum+=m.tn; const p=cum/totalB*100; const g=p<=80?'A':p<=95?'B':'C'; return{...m,grade:g,cumPct:p};});
+    const aI=abcData.filter(m=>m.grade==='A'), bI=abcData.filter(m=>m.grade==='B'), cI=abcData.filter(m=>m.grade==='C');
+    if(chartABC) chartABC.destroy();
+    chartABC=new Chart(document.getElementById('cvABC').getContext('2d'),{type:'doughnut',data:{labels:[`A등급(${aI.length}종)`,`B등급(${bI.length}종)`,`C등급(${cI.length}종)`],datasets:[{data:[aI.reduce((s,m)=>s+m.tn,0),bI.reduce((s,m)=>s+m.tn,0),cI.reduce((s,m)=>s+m.tn,0)],backgroundColor:['#4f46e5','#10b981','#9ca3af']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},cutout:'60%'}});
+
+    document.querySelector('#tblABC thead').innerHTML='<tr><th>등급</th><th>상품명</th><th class="num">매출액</th><th class="num">누적비중</th></tr>';
+    document.querySelector('#tblABC tbody').innerHTML=abcData.slice(0,15).map(m=>`<tr><td><span style="font-weight:700;color:${{A:'#4f46e5',B:'#10b981',C:'#9ca3af'}[m.grade]}">${m.grade}</span></td><td style="font-size:12px">${m.name}</td><td class="num" style="font-size:12px">${fmt(m.tn)}</td><td class="num" style="font-size:12px">${m.cumPct.toFixed(1)}%</td></tr>`).join('');
+
+    // 시간대 기회 분석
+    const segData=SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)}));
+    const peakSeg=segData.reduce((a,b)=>b.sales>a.sales?b:a,segData[0]);
+    if(chartOpportunity) chartOpportunity.destroy();
+    chartOpportunity=new Chart(document.getElementById('cvOpportunity').getContext('2d'),{type:'bar',data:{labels:segData.map(s=>s.name),datasets:[{label:'구간별 매출',data:segData.map(s=>s.sales),backgroundColor:segData.map(s=>s.color+'bb'),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>(v/10000).toFixed(0)+'만'}},x:{grid:{display:false}}}}});
+
+    const lowSegs=segData.filter(s=>s.sales>0).sort((a,b)=>a.sales-b.sales).slice(0,2);
+    document.getElementById('opportunityInsight').innerHTML=`<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:12px 16px;font-size:13px;color:#78350f;line-height:1.8"><b>📊 인사이트:</b> 매출 피크는 <b>${peakSeg.name}</b>입니다. ${lowSegs.map(s=>`<b>${s.name}</b>(${(_cTotalA>0?(s.sales/_cTotalA*100).toFixed(1):0)}%)`).join(', ')} 구간은 낮아 <b>타임세일·런치스페셜·SNS 프로모션</b> 여지가 있습니다.</div>`;
+
+    // 채널 인사이트
+    const hall=parsedB.reduce((s,r)=>s+r.ch['일반 홀']+r.ch['티오더(홀)'],0);
+    const deliver=parsedB.reduce((s,r)=>s+r.ch['배달'],0);
+    const takeout=parsedB.reduce((s,r)=>s+r.ch['포장'],0);
+    const chT=hall+deliver+takeout||1;
+    const topDel=[...parsedB].filter(r=>r.ch['배달']>0).sort((a,b)=>b.ch['배달']-a.ch['배달']).slice(0,3).map(r=>r.name).join(', ')||'-';
+    const topTake=[...parsedB].filter(r=>r.ch['포장']>0).sort((a,b)=>b.ch['포장']-a.ch['포장']).slice(0,3).map(r=>r.name).join(', ')||'-';
+    document.getElementById('channelInsight').innerHTML=`
+        <div style="background:#eff6ff;border-radius:10px;padding:14px;border:1px solid #bfdbfe"><div style="font-weight:700;color:#1e40af;margin-bottom:8px">🏠 홀 매출 ${(hall/chT*100).toFixed(1)}%</div><div style="font-size:12px;color:#374151">좌석회전율 개선 및 티오더 활성화가 핵심입니다.</div></div>
+        <div style="background:#fef2f2;border-radius:10px;padding:14px;border:1px solid #fecaca"><div style="font-weight:700;color:#b91c1c;margin-bottom:8px">🛵 배달 ${(deliver/chT*100).toFixed(1)}%</div><div style="font-size:12px;color:#374151">TOP: ${topDel}<br>배달 전용 세트메뉴·최소주문금액 전략 검토 권장</div></div>
+        <div style="background:#f0fdf4;border-radius:10px;padding:14px;border:1px solid #bbf7d0"><div style="font-weight:700;color:#15803d;margin-bottom:8px">📦 포장 ${(takeout/chT*100).toFixed(1)}%</div><div style="font-size:12px;color:#374151">TOP: ${topTake}<br>포장 할인쿠폰·재방문 스탬프 도입 효과 기대</div></div>
+    `;
+
+    // 전략 제언
+    const peakDay=DAY_ORDER.filter(d=>W.dayAgg[d]>0).sort((a,b)=>W.dayAgg[b]-W.dayAgg[a])[0]||'-';
+    const lowDay=DAY_ORDER.filter(d=>W.dayAgg[d]>0).sort((a,b)=>W.dayAgg[a]-W.dayAgg[b])[0]||'-';
+    document.getElementById('strategyReport').innerHTML=`
+        <div style="margin-bottom:16px"><div style="font-size:15px;font-weight:700;color:#c7d2fe;margin-bottom:6px">① 핵심 메뉴 집중 전략 (A등급 강화)</div>
+        <div style="color:#e0e7ff">A등급 ${aI.length}종 메뉴(${aI.slice(0,3).map(m=>m.name).join(', ')})가 전체 매출의 80%를 담당합니다. <b>원가관리·품질 일관성·포션 표준화</b>를 최우선으로 하고, 사진 메뉴판 교체와 SNS 홍보 콘텐츠 집중 제작을 권장합니다.</div></div>
+        <div style="margin-bottom:16px"><div style="font-size:15px;font-weight:700;color:#c7d2fe;margin-bottom:6px">② 요일별 매출 평준화 전략</div>
+        <div style="color:#e0e7ff">최고 요일 <b style="color:#fbbf24">${peakDay}요일</b> vs 최저 요일 <b style="color:#f87171">${lowDay}요일</b>. ${lowDay}요일에 <b>런치세트 특가·단체예약 인센티브·SNS 플래시세일</b>을 도입하여 요일 격차를 줄이세요.</div></div>
+        <div style="margin-bottom:16px"><div style="font-size:15px;font-weight:700;color:#c7d2fe;margin-bottom:6px">③ 피크타임 극대화 전략</div>
+        <div style="color:#e0e7ff">피크 구간 <b style="color:#fbbf24">${peakSeg.name}</b>에 <b>테이블 세팅 표준화·주방 동선 최적화·직원 배치 강화</b>로 회전율을 높이세요. 비피크에는 배달·포장 프로모션으로 보완합니다.</div></div>
+        <div style="margin-bottom:16px"><div style="font-size:15px;font-weight:700;color:#c7d2fe;margin-bottom:6px">④ 메뉴 다이어트 전략 (C등급 정리)</div>
+        <div style="color:#e0e7ff">C등급 <b style="color:#f87171">${cI.length}종</b>은 매출 기여가 낮으면서 주방 복잡성을 높입니다. 분기 1회 메뉴 리뷰로 <b>수익 낮은 메뉴 단종·통합</b>하고 신 세트메뉴로 객단가를 올리세요.</div></div>
+        <div><div style="font-size:15px;font-weight:700;color:#c7d2fe;margin-bottom:6px">⑤ 채널 믹스 최적화 전략</div>
+        <div style="color:#e0e7ff">배달 비중 <b style="color:#fbbf24">${(deliver/chT*100).toFixed(1)}%</b>. 배달 플랫폼 단가 협상·<b>배달전용 메뉴(1인분화·세트 묶음)</b> 개발로 수익성을 개선하고, 홀 고객 재방문을 위한 <b>멤버십·스탬프 제도</b>를 도입하세요.</div></div>
+    `;
+}
+
+function runSimulator() {
+    const target=parseFloat(document.getElementById('targetSales').value)*10000||0;
+    if(!target){document.getElementById('simulatorResult').innerHTML='';return;}
+    if(!_cWeights) return;
+    const dates=[...new Set(_cDataA.map(r=>r.date))];
+    const curDaily=_cTotalA/(dates.length||1);
+    const growth=curDaily>0?((target-curDaily)/curDaily*100).toFixed(1):'-';
+    document.getElementById('simulatorResult').innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px">
+        <div class="mc" style="border-left-color:#4f46e5"><div class="mc-l">현재 일평균 매출</div><div class="mc-v">${fmt(curDaily)}원</div></div>
+        <div class="mc" style="border-left-color:#10b981"><div class="mc-l">목표 일매출</div><div class="mc-v" style="color:#059669">${fmt(target)}원</div></div>
+        <div class="mc" style="border-left-color:#f59e0b"><div class="mc-l">필요 성장률</div><div class="mc-v" style="color:#d97706">${growth}%</div></div>
+    </div>
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px;margin-top:12px;font-size:13px;color:#166534;line-height:1.8">
+        💡 현재 일평균 ${fmt(curDaily)}원 → 목표 ${fmt(target)}원 달성을 위해 <b>${growth}% 성장</b>이 필요합니다.
+    </div>`;
+}
+
+function downloadExcelC() {
+    if(!_cWeights) return;
+    const wb=XLSX.utils.book_new(), W=_cWeights, tops=_cSortedB.slice(0,10);
+    const totalB=parsedB.reduce((s,r)=>s+r.tn,0);
+
+    const s1=_cDataA.map(r=>({'일자':r.date,'요일':r.day,'매출액':r.slots['합계']?.amt||0,'매출건수':r.slots['합계']?.cnt||0,'고객수':r.slots['합계']?.cust||0}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s1),'1_일자별매출');
+
+    const s2=HOURS.map(h=>({'시간대':`${h}시`,'총매출액':W.hourAgg[h]}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s2),'2_시간대별매출');
+
+    const s3=_cSortedB.map((r,i)=>({'순위':i+1,'상품명':r.name,'카테고리':r.cat,'판매수량':r.tq,'실매출액':r.tn,'홀':r.ch['일반 홀'],'티오더':r.ch['티오더(홀)'],'포장':r.ch['포장'],'배달':r.ch['배달'],'비중(%)':((r.tn/totalB)*100).toFixed(1)}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s3),'3_상품별매출');
+
+    const months=Object.keys(W.monthAgg).sort();
+    if(months.length>0){
+        const s4=months.map(mo=>{const row={'월':mo}; tops.forEach(m=>row[m.name]=Math.round(m.tn*W.monthW[mo])); return row;});
+        XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s4),'4_월별_인기메뉴');
+    }
+    if(excelDataW.length>0) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(excelDataW),'5_요일별_인기메뉴');
+    if(excelDataT.length>0) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(excelDataT),'6_시간대별_인기메뉴');
+
+    XLSX.writeFile(wb,`맛나감자탕_단독매장_통합리포트_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function copyForAIC() {
+    if(!_cWeights) return;
+    const store=document.getElementById('storeSelC').value, W=_cWeights;
+    const totalB=parsedB.reduce((s,r)=>s+r.tn,0)||1;
+    const peakDay=DAY_ORDER.filter(d=>W.dayAgg[d]>0).sort((a,b)=>W.dayAgg[b]-W.dayAgg[a])[0]||'-';
+    const peakSeg=SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)})).sort((a,b)=>b.sales-a.sales)[0];
+    let r=`[맛나감자탕 ${store} 경영 분석 리포트]\n\n`;
+    r+=`■ 기간 총매출: ${fmt(_cTotalA)}원 | 분석 메뉴: ${parsedB.length}종\n`;
+    r+=`■ 피크 요일: ${peakDay}요일 | 피크 시간대: ${peakSeg?.name||'-'}\n\n`;
+    r+=`■ 베스트 메뉴 TOP 10\n`+_cSortedB.slice(0,10).map((m,i)=>`${i+1}위: ${m.name} (${fmt(m.tn)}원, ${((m.tn/totalB)*100).toFixed(1)}%)`).join('\n');
+    r+=`\n\n■ 요일별 총매출\n`+DAY_ORDER.filter(d=>W.dayAgg[d]>0).map(d=>`${d}요일: ${fmt(W.dayAgg[d])}원`).join(' | ');
+    r+=`\n\n■ 시간대별 총매출\n`+SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)})).filter(s=>s.sales>0).map(s=>`${s.name}: ${fmt(s.sales)}원`).join(' | ');
+    r+=`\n\n위 데이터를 바탕으로 이 매장의 현재 상황을 진단하고, 매출 극대화를 위한 구체적 실행 방안 5가지를 단계별로 제시해줘.`;
+    navigator.clipboard.writeText(r).then(()=>alert('AI 경영 상담 데이터 복사 완료! Claude나 ChatGPT에 붙여넣어 활용하세요.'));
+}
+
+</script>
+</body>
+</html>Auto detect text files and perform LF normalization
 * text=auto
