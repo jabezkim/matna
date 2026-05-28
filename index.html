@@ -296,12 +296,13 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upA">
-                <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple style="display:none;">
-                <label for="fiA" class="drop" id="dzA" style="display:block;cursor:pointer;">
+                <label for="fiA" class="drop" id="dzA" style="display:block;cursor:pointer;position:relative;">
+                    <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple
+                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1;">
                     <i class="ti ti-file-spreadsheet"></i>
                     <p><b>[일자별/시간대별]</b> 여러 개의 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
-                    <div style="margin-top:14px;">
+                    <div style="margin-top:14px;position:relative;z-index:0;">
                         <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
                             <i class="ti ti-upload"></i> 파일 선택
                         </span>
@@ -402,12 +403,13 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upB">
-                <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple style="display:none;">
-                <label for="fiB" class="drop" id="dzB" style="display:block;cursor:pointer;">
+                <label for="fiB" class="drop" id="dzB" style="display:block;cursor:pointer;position:relative;">
+                    <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple
+                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1;">
                     <i class="ti ti-receipt-refund"></i>
                     <p><b>[상품별 매출]</b> 분할된 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 상품별 양식 (.xlsx, .xls, .csv)</small>
-                    <div style="margin-top:14px;">
+                    <div style="margin-top:14px;position:relative;z-index:0;">
                         <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
                             <i class="ti ti-upload"></i> 파일 선택
                         </span>
