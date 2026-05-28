@@ -300,18 +300,13 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upA">
-                <div class="drop" id="dzA" style="padding:2rem 1rem;">
-                    <i class="ti ti-file-spreadsheet"></i>
-                    <p style="margin-bottom:6px;"><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
-                    <small>포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
+                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;">
+                    <i class="ti ti-file-spreadsheet" style="font-size:36px;color:#4f46e5;display:block;margin-bottom:10px;"></i>
+                    <p style="margin-bottom:6px;font-size:14px;"><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
+                    <small style="color:#9ca3af;font-size:12px;">포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
                     <div style="margin-top:20px;">
-                        <button type="button"
-                            style="display:block;width:100%;padding:16px;background:#4f46e5;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:0.5px;"
-                            onclick="document.getElementById('fiA').click()">
-                            📂 파일 선택하기
-                        </button>
                         <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple
-                            style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
                     </div>
                 </div>
             </div>
@@ -409,18 +404,13 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upB">
-                <div class="drop" id="dzB" style="padding:2rem 1rem;">
-                    <i class="ti ti-receipt-refund"></i>
-                    <p style="margin-bottom:6px;"><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
-                    <small>상품별 양식 (.xlsx, .xls, .csv)</small>
+                <div style="border:2px dashed #cbd5e1;border-radius:12px;padding:2rem 1rem;text-align:center;background:#f9fafb;margin-bottom:1rem;">
+                    <i class="ti ti-receipt-refund" style="font-size:36px;color:#4f46e5;display:block;margin-bottom:10px;"></i>
+                    <p style="margin-bottom:6px;font-size:14px;"><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
+                    <small style="color:#9ca3af;font-size:12px;">상품별 양식 (.xlsx, .xls, .csv)</small>
                     <div style="margin-top:20px;">
-                        <button type="button"
-                            style="display:block;width:100%;padding:16px;background:#4f46e5;color:#fff;border:none;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;letter-spacing:0.5px;"
-                            onclick="document.getElementById('fiB').click()">
-                            📂 파일 선택하기
-                        </button>
                         <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple
-                            style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
                     </div>
                 </div>
             </div>
