@@ -296,12 +296,17 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upA">
-                <div class="drop" id="dzA">
+                <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple style="display:none;">
+                <label for="fiA" class="drop" id="dzA" style="display:block;cursor:pointer;">
                     <i class="ti ti-file-spreadsheet"></i>
-                    <p><b>[일자별/시간대별]</b> 여러 개의 엑셀 파일을 한 번에 드래그하거나 선택하세요.</p>
+                    <p><b>[일자별/시간대별]</b> 여러 개의 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
-                </div>
-                <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple>
+                    <div style="margin-top:14px;">
+                        <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
+                            <i class="ti ti-upload"></i> 파일 선택
+                        </span>
+                    </div>
+                </label>
             </div>
             
             <div id="resA" class="hidden">
@@ -397,12 +402,17 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upB">
-                <div class="drop" id="dzB">
+                <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple style="display:none;">
+                <label for="fiB" class="drop" id="dzB" style="display:block;cursor:pointer;">
                     <i class="ti ti-receipt-refund"></i>
-                    <p><b>[상품별 매출]</b> 1~4개 등 분할된 엑셀 파일을 한 번에 드래그하여 올리세요.</p>
+                    <p><b>[상품별 매출]</b> 분할된 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 상품별 양식 (.xlsx, .xls, .csv)</small>
-                </div>
-                <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple>
+                    <div style="margin-top:14px;">
+                        <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
+                            <i class="ti ti-upload"></i> 파일 선택
+                        </span>
+                    </div>
+                </label>
             </div>
             
             <div id="resB" class="hidden">
@@ -804,15 +814,16 @@ function readFileAsync(file) {
 }
 
 function setupDrop(dzId, fiId, cb){
-  const dz = document.getElementById(dzId), fi = document.getElementById(fiId);
-  fi.style.display = 'none';
-  dz.addEventListener('click', ()=>fi.click());
-  dz.addEventListener('dragover', e=>{e.preventDefault(); dz.classList.add('over')});
-  dz.addEventListener('dragleave', ()=>dz.classList.remove('over'));
+  const dz = document.getElementById(dzId);
+  const fi = document.getElementById(fiId);
+  // PC: 드래그&드롭 지원
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.style.borderColor='#4f46e5'; });
+  dz.addEventListener('dragleave', ()=>{ dz.style.borderColor=''; });
   dz.addEventListener('drop', e=>{
-      e.preventDefault(); dz.classList.remove('over'); 
+      e.preventDefault(); dz.style.borderColor='';
       if(e.dataTransfer.files.length) cb(Array.from(e.dataTransfer.files));
   });
+  // 모바일/PC 공통: label→input 연결로 파일 선택
   fi.addEventListener('change', e=>{
       if(e.target.files.length) cb(Array.from(e.target.files));
   });
