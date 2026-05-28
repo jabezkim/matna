@@ -802,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── 비밀번호 잠금 ──
-const CORRECT_PW = '3966';
+const CORRECT_PW = '1234';
 
 function checkPW() {
     const input = document.getElementById('pwInput').value;
@@ -885,6 +885,27 @@ function setupDrop(dzId, fiId, cb){
   });
 }
 
+function saveExcel(wb, filename) {
+    try {
+        // 방법1: Blob + a태그 (모바일 호환)
+        const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+        const blob = new Blob([wbout], {type:'application/octet-stream'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+    } catch(e) {
+        // 방법2: 폴백
+        try { XLSX.writeFile(wb, filename); } catch(e2) {
+            alert('다운로드에 실패했습니다.\nPC에서 다운로드해주세요.');
+        }
+    }
+}
+
 function downloadSystem() {
     const blob = new Blob([document.documentElement.outerHTML], {type: "text/html"});
     const a = document.createElement('a');
@@ -898,7 +919,22 @@ function downloadSystem() {
 // ==========================================
 let parsedA = null, chartA = null, chartCompare = null;
 let curTabA = 'date';
-setupDrop('dzA', 'fiA', loadA);
+
+// DOM 준비 후 이벤트 연결
+window.addEventListener('load', function() {
+    setupDrop('dzA', 'fiA', loadA);
+    setupDrop('dzB', 'fiB', loadB);
+    // 셀렉트 이벤트
+    ['storeSel','metSel'].forEach(id=>{
+        const el = document.getElementById(id);
+        if(el) el.addEventListener('change', ()=>{ if(parsedA) renderA(); });
+    });
+    // 파일 input에 직접 change 이벤트 추가 (이중 보험)
+    const fiA = document.getElementById('fiA');
+    const fiB = document.getElementById('fiB');
+    if(fiA) fiA.onchange = e=>{ if(e.target.files.length) loadA(Array.from(e.target.files)); };
+    if(fiB) fiB.onchange = e=>{ if(e.target.files.length) loadB(Array.from(e.target.files)); };
+});
 
 function clickTabA(btn) {
     document.querySelectorAll('#tabsA .tab').forEach(x=>x.classList.remove('on'));
@@ -906,7 +942,6 @@ function clickTabA(btn) {
     curTabA = btn.dataset.t;
     if(parsedA) renderA();
 }
-['storeSel','metSel'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{ if(parsedA) renderA(); }));
 
 async function loadA(files){
   if(!files || files.length === 0) return;
@@ -1268,7 +1303,7 @@ function downloadExcelA() {
     wsRaw['!cols'] = [{wch:12},{wch:6},{wch:12},{wch:14},{wch:10},{wch:10}];
     XLSX.utils.book_append_sheet(wb, wsRaw, '원본데이터');
 
-    XLSX.writeFile(wb, `맛나감자탕_${sheetName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    saveExcel(wb, `맛나감자탕_${sheetName}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 function resetA(){
     parsedA=null;
@@ -1333,7 +1368,6 @@ let parsedB = [], activeFilterB = "전체", sortStateB = { col: 'tn', desc: true
 let parsedBRaw = []; // 매장 정보 포함 원본
 let chartBCompare = null;
 const userTabsB = ["감자탕", "뼈찜", "간장뼈찜", "뼈구이", "세트", "식사", "사리", "음료", "배달", "포장", "기타"];
-setupDrop('dzB','fiB',loadB);
 
 function normalizeMenuName(rawName) {
     let name = String(rawName).replace(/\.+$/, "").replace(/[\s_]+/g, '').trim();
@@ -1768,7 +1802,7 @@ function downloadExcelB() {
             XLSX.utils.book_append_sheet(wb, ws2, sheetName);
         });
     }
-    XLSX.writeFile(wb, `맛나감자탕_상세매출_${activeFilterB}_${new Date().toISOString().slice(0,10)}.xlsx`);
+    saveExcel(wb, `맛나감자탕_상세매출_${activeFilterB}_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function copyForAIB() {
@@ -2377,7 +2411,7 @@ function downloadExcelC() {
     if(excelDataW.length>0) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(excelDataW),'5_요일별_인기메뉴');
     if(excelDataT.length>0) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(excelDataT),'6_시간대별_인기메뉴');
 
-    XLSX.writeFile(wb,`맛나감자탕_단독매장_통합리포트_${new Date().toISOString().slice(0,10)}.xlsx`);
+    saveExcel(wb, `맛나감자탕_단독매장_통합리포트_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 
 function copyForAIC() {
