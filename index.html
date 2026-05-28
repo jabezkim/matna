@@ -306,7 +306,8 @@ self.addEventListener('fetch', e => {
                     <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
                         <input type="file" id="fiA" multiple
-                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
+                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;"
+                            ondragover="event.preventDefault();" ondrop="event.preventDefault();">
                     </div>
                 </div>
             </div>
@@ -410,7 +411,8 @@ self.addEventListener('fetch', e => {
                     <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
                         <input type="file" id="fiB" multiple
-                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;">
+                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;"
+                            ondragover="event.preventDefault();" ondrop="event.preventDefault();">
                     </div>
                 </div>
             </div>
@@ -874,20 +876,26 @@ function setupDrop(dzId, fiId, cb){
     const fi = document.getElementById(fiId);
     if(!dz || !fi) return;
 
-    // PC 드래그&드롭
-    dz.addEventListener('dragenter', e=>{ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='#4f46e5'; dz.style.background='#f5f3ff'; });
-    dz.addEventListener('dragover',  e=>{ e.preventDefault(); e.stopPropagation(); dz.style.borderColor='#4f46e5'; dz.style.background='#f5f3ff'; });
-    dz.addEventListener('dragleave', e=>{ e.preventDefault(); e.stopPropagation();
-        if(!dz.contains(e.relatedTarget)){ dz.style.borderColor=''; dz.style.background=''; }
-    });
-    dz.addEventListener('drop', e=>{
-        e.preventDefault(); e.stopPropagation();
-        dz.style.borderColor=''; dz.style.background='';
-        const files = Array.from(e.dataTransfer.files);
-        if(files.length) cb(files);
+    function highlight(){ dz.style.borderColor='#4f46e5'; dz.style.background='#f5f3ff'; dz.style.borderStyle='solid'; }
+    function unhighlight(){ dz.style.borderColor=''; dz.style.background=''; dz.style.borderStyle='dashed'; }
+
+    // document 전체에서 dragover/drop 막기 (브라우저 기본 동작 방지)
+    ['dragenter','dragover','dragleave','drop'].forEach(evt=>{
+        document.addEventListener(evt, e=>e.preventDefault(), false);
     });
 
-    // 파일 선택 change
+    dz.addEventListener('dragenter',  e=>{ e.preventDefault(); e.stopPropagation(); highlight(); });
+    dz.addEventListener('dragover',   e=>{ e.preventDefault(); e.stopPropagation(); highlight(); });
+    dz.addEventListener('dragleave',  e=>{ e.preventDefault(); e.stopPropagation();
+        if(!dz.contains(e.relatedTarget)) unhighlight();
+    });
+    dz.addEventListener('drop', e=>{
+        e.preventDefault(); e.stopPropagation(); unhighlight();
+        const files = Array.from(e.dataTransfer.files).filter(f=>/\.(xlsx|xls|csv)$/i.test(f.name));
+        if(files.length) cb(files);
+        else if(e.dataTransfer.files.length) alert('엑셀 파일(.xlsx, .xls, .csv)을 올려주세요.');
+    });
+
     fi.addEventListener('change', e=>{
         if(e.target.files.length) cb(Array.from(e.target.files));
     });
