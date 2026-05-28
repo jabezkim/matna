@@ -97,10 +97,10 @@ self.addEventListener('fetch', e => {
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
-        body { background-color: #f3f4f6; font-family: var(--font-sans); color: var(--color-text-primary); padding-bottom: 80px; }
+        body { background-color: #f3f4f6; font-family: var(--font-sans); color: var(--color-text-primary); padding-bottom: 80px; overflow-x: hidden; width: 100%; }
 
         /* ── 컨테이너 ── */
-        .container { max-width: 1200px; width: 100%; background: var(--color-background-primary); padding: 1rem; margin: 0 auto; }
+        .container { max-width: 1200px; width: 100%; background: var(--color-background-primary); padding: 1rem; margin: 0 auto; overflow-x: hidden; }
         @media(min-width:768px) { body { padding: 1.5rem 1rem 2rem; } .container { padding: 2rem; border-radius: var(--border-radius-lg); box-shadow: 0 4px 10px -1px rgba(0,0,0,0.08); } }
 
         .wrap { padding: 0.5rem 0; }
@@ -148,17 +148,17 @@ self.addEventListener('fetch', e => {
         .three-col { display: grid; grid-template-columns: 1fr; gap: 12px; margin-bottom: 1rem; }
         @media(min-width:768px) { .two-col { grid-template-columns: 1.2fr 0.8fr; gap: 16px; margin-bottom: 1.5rem; } .three-col { grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 1.5rem; } }
 
-        .panel { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
+        .panel { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); padding: 1rem; margin-bottom: 1rem; overflow-x: auto; max-width: 100%; }
         @media(min-width:768px) { .panel { padding: 1.25rem; margin-bottom: 1.25rem; } }
-        .panel-t { font-size: 13px; font-weight: 700; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px; }
-        canvas { max-height: 240px; width: 100%; }
+        .panel-t { font-size: 13px; font-weight: 700; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        canvas { max-height: 240px; width: 100% !important; }
         @media(min-width:768px) { canvas { max-height: 280px; } }
 
         /* ── 테이블 ── */
         .seg-grid { display: flex; flex-direction: column; gap: 8px; }
         .seg { border-radius: var(--border-radius-md); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; }
-        .tbl-wrap { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1rem; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 500px; }
+        .tbl-wrap { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); overflow-x: scroll; -webkit-overflow-scrolling: touch; margin-bottom: 1rem; display: block; width: 100%; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 560px; }
         @media(min-width:768px) { table { font-size: 13px; min-width: 650px; } }
         th { background: #f8fafc; padding: 10px 12px; text-align: left; font-weight: 700; border-bottom: 2px solid var(--color-border-secondary); cursor: pointer; white-space: nowrap; }
         td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; white-space: nowrap; }
@@ -176,11 +176,15 @@ self.addEventListener('fetch', e => {
         .btn.sys { background: #10b981; color: #fff; border-color: #10b981; }
 
         /* ── 셀렉트/폼 ── */
-        .sel-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 10px 12px; border-radius: var(--border-radius-md); border: 1px solid #f3f4f6; }
+        .sel-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 10px 12px; border-radius: var(--border-radius-md); border: 1px solid #f3f4f6; max-width: 100%; }
         .sel-row label { font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 4px; }
-        select { font-size: 13px; padding: 8px 10px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); outline: none; min-height: 40px; background: #fff; }
-        input[type="text"], input[type="password"], input[type="number"] { min-height: 44px; font-size: 16px !important; /* iOS 줌 방지 */ }
+        select { font-size: 13px; padding: 8px 10px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); outline: none; min-height: 40px; background: #fff; max-width: 100%; }
+        input[type="text"], input[type="password"], input[type="number"] { min-height: 44px; font-size: 16px !important; }
         .hidden { display: none !important; }
+
+        /* ── 섹션C 내부 탭 스크롤 ── */
+        #tabsC { display: flex !important; gap: 5px !important; flex-wrap: nowrap !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch !important; padding: 5px !important; scrollbar-width: none !important; background: #f1f5f9 !important; border-radius: 10px !important; margin-bottom: 1.25rem !important; }
+        #tabsC::-webkit-scrollbar { display: none; }
 
         /* ── 툴팁 (모바일: 탭하면 표시) ── */
         .tip { position: relative; cursor: pointer; }
@@ -286,28 +290,25 @@ self.addEventListener('fetch', e => {
 
         <div id="secA">
             <div class="tab-row" id="tabsA">
-                <button class="tab on" data-t="date"><i class="ti ti-calendar-event"></i> 일자별 분석</button>
-                <button class="tab" data-t="month"><i class="ti ti-calendar-month"></i> 월별 분석</button>
-                <button class="tab" data-t="weekday"><i class="ti ti-calendar-week"></i> 요일별 분석 (평균)</button> 
-                <button class="tab" data-t="hour"><i class="ti ti-clock"></i> 시간대별 분석</button>
-                <button class="tab" data-t="store"><i class="ti ti-building-store"></i> 가맹점 랭킹</button>
-                <button class="tab" data-t="cross"><i class="ti ti-border-all"></i> 일자 × 시간대 히트맵</button>
-                <button class="tab" data-t="weekdayCross"><i class="ti ti-table"></i> 요일 평균 시간대 히트맵</button>
+                <button class="tab on" data-t="date" onclick="clickTabA(this)"><i class="ti ti-calendar-event"></i> 일자별</button>
+                <button class="tab" data-t="month" onclick="clickTabA(this)"><i class="ti ti-calendar-month"></i> 월별</button>
+                <button class="tab" data-t="weekday" onclick="clickTabA(this)"><i class="ti ti-calendar-week"></i> 요일별</button>
+                <button class="tab" data-t="hour" onclick="clickTabA(this)"><i class="ti ti-clock"></i> 시간대별</button>
+                <button class="tab" data-t="store" onclick="clickTabA(this)"><i class="ti ti-building-store"></i> 가맹점</button>
+                <button class="tab" data-t="cross" onclick="clickTabA(this)"><i class="ti ti-border-all"></i> 히트맵</button>
+                <button class="tab" data-t="weekdayCross" onclick="clickTabA(this)"><i class="ti ti-table"></i> 요일히트맵</button>
             </div>
             
             <div id="upA">
-                <label for="fiA" class="drop" id="dzA" style="display:block;cursor:pointer;position:relative;">
-                    <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple
-                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1;">
+                <div class="drop" id="dzA">
                     <i class="ti ti-file-spreadsheet"></i>
-                    <p><b>[일자별/시간대별]</b> 여러 개의 엑셀 파일을 선택하세요.</p>
+                    <p><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 포스 시간대별 양식 (.xlsx, .xls, .csv)</small>
-                    <div style="margin-top:14px;position:relative;z-index:0;">
-                        <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
-                            <i class="ti ti-upload"></i> 파일 선택
-                        </span>
+                    <div style="margin-top:16px;">
+                        <input type="file" id="fiA" accept=".xlsx,.xls,.csv" multiple
+                            style="font-size:16px;padding:10px;width:100%;border:2px solid #4f46e5;border-radius:8px;background:#fff;color:#4f46e5;font-weight:700;cursor:pointer;">
                     </div>
-                </label>
+                </div>
             </div>
             
             <div id="resA" class="hidden">
@@ -360,7 +361,7 @@ self.addEventListener('fetch', e => {
                 <div class="tbl-wrap"><table id="tblA"><thead></thead><tbody></tbody></table></div>
                 
                 <div class="btns">
-                    <button class="btn p" id="expA"><i class="ti ti-download"></i> 데이터 내보내기</button>
+                    <button class="btn p" id="expA" onclick="downloadExcelA()"><i class="ti ti-download"></i> 데이터 내보내기</button>
                     <button class="btn ai" onclick="copyForAIA()"><i class="ti ti-robot"></i> AI와 데이터 공유</button>
                     <button class="btn" onclick="resetA()"><i class="ti ti-refresh"></i> 다른 파일 분석</button>
                 </div>
@@ -403,18 +404,15 @@ self.addEventListener('fetch', e => {
             </div>
             
             <div id="upB">
-                <label for="fiB" class="drop" id="dzB" style="display:block;cursor:pointer;position:relative;">
-                    <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple
-                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;z-index:1;">
+                <div class="drop" id="dzB">
                     <i class="ti ti-receipt-refund"></i>
-                    <p><b>[상품별 매출]</b> 분할된 엑셀 파일을 선택하세요.</p>
+                    <p><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
                     <small>지원양식: 상품별 양식 (.xlsx, .xls, .csv)</small>
-                    <div style="margin-top:14px;position:relative;z-index:0;">
-                        <span style="display:inline-block;background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;font-size:14px;font-weight:700;">
-                            <i class="ti ti-upload"></i> 파일 선택
-                        </span>
+                    <div style="margin-top:16px;">
+                        <input type="file" id="fiB" accept=".xlsx,.xls,.csv" multiple
+                            style="font-size:16px;padding:10px;width:100%;border:2px solid #4f46e5;border-radius:8px;background:#fff;color:#4f46e5;font-weight:700;cursor:pointer;">
                     </div>
-                </label>
+                </div>
             </div>
             
             <div id="resB" class="hidden">
@@ -443,12 +441,12 @@ self.addEventListener('fetch', e => {
                 </div>
                 <div class="metrics" id="metsB"></div>
                 <!-- 카테고리별 요약 -->
-                <div class="panel" style="margin-bottom:1.25rem;padding:0;overflow:hidden;">
-                    <p class="panel-t" style="padding:14px 18px;margin-bottom:0;border-bottom:1px solid #f1f5f9;">
+                <div class="panel" style="margin-bottom:1.25rem;padding:0;overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                    <p class="panel-t" style="padding:14px 18px;margin-bottom:0;border-bottom:1px solid #f1f5f9;white-space:nowrap;">
                         <i class="ti ti-chart-donut"></i> 카테고리별 매출 · 비율 · 메뉴 수
-                        <span style="font-size:12px;color:#94a3b8;margin-left:8px">클릭하면 해당 카테고리로 필터링</span>
+                        <span style="font-size:12px;color:#94a3b8;margin-left:8px">← 옆으로 밀어서 확인 / 탭하면 필터링</span>
                     </p>
-                    <div id="catSummaryB"></div>
+                    <div id="catSummaryB" style="overflow-x:auto;-webkit-overflow-scrolling:touch;min-width:100%;"></div>
                 </div>
                 <!-- 카테고리 필터 탭 -->
                 <div class="tab-row" id="tabsFilterB" style="margin-bottom:0; border-bottom:1px solid var(--color-border-secondary); padding-bottom:10px;"></div>
@@ -682,6 +680,64 @@ self.addEventListener('fetch', e => {
 // ==========================================
 // 공통 글로벌 설정
 // ==========================================
+// ── 클립보드 복사 (모바일 호환) ──
+function copyToClipboard(text, successMsg) {
+    successMsg = successMsg || '복사되었습니다!\nClaude나 ChatGPT에 붙여넣어 사용하세요.';
+    // 방법1: 최신 Clipboard API
+    if(navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(()=>alert(successMsg))
+            .catch(()=>fallbackCopy(text, successMsg));
+    } else {
+        fallbackCopy(text, successMsg);
+    }
+}
+function fallbackCopy(text, msg) {
+    // 방법2: textarea + execCommand (구형/안드로이드 호환)
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+        const ok = document.execCommand('copy');
+        alert(ok ? msg : '복사 실패. 직접 선택 후 복사해주세요.');
+    } catch(e) {
+        // 방법3: 복사 안 되면 모달로 텍스트 보여주기
+        showCopyModal(text);
+    }
+    document.body.removeChild(ta);
+}
+function showCopyModal(text) {
+    const existing = document.getElementById('copyModal');
+    if(existing) existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'copyModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
+    modal.innerHTML = `
+        <div style="background:#fff;border-radius:12px;padding:20px;width:100%;max-width:500px;max-height:80vh;display:flex;flex-direction:column;">
+            <div style="font-weight:700;font-size:15px;margin-bottom:10px;">📋 아래 텍스트를 복사하세요</div>
+            <textarea style="flex:1;min-height:200px;border:1px solid #e5e7eb;border-radius:8px;padding:10px;font-size:12px;resize:none;" readonly>${text}</textarea>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button onclick="this.closest('textarea') && this.closest('textarea').select(); document.execCommand('copy');"
+                    style="flex:1;padding:12px;background:#4f46e5;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">전체 선택 후 복사</button>
+                <button onclick="document.getElementById('copyModal').remove();"
+                    style="padding:12px 16px;background:#f1f5f9;border:none;border-radius:8px;font-size:14px;cursor:pointer;">닫기</button>
+            </div>
+        </div>`;
+    // 텍스트 선택 버튼 수정
+    const btn = modal.querySelector('button');
+    btn.onclick = () => {
+        const ta = modal.querySelector('textarea');
+        ta.select();
+        try { document.execCommand('copy'); alert('복사되었습니다!'); } catch(e) {}
+    };
+    document.body.appendChild(modal);
+    // 자동 전체선택
+    setTimeout(()=>{ const ta = modal.querySelector('textarea'); ta.focus(); ta.select(); }, 100);
+}
+
 // ── PWA 설치 ──
 let deferredPrompt = null;
 
@@ -725,18 +781,16 @@ function updateBottomNav(mode) {
     });
 }
 
-// 툴팁 터치 지원 (모바일)
+// 툴팁 터치 지원 (모바일) - 클릭/탭 방해하지 않음
 document.addEventListener('DOMContentLoaded', () => {
-    document.addEventListener('touchstart', e => {
-        const tip = e.target.closest('.tip');
+    document.addEventListener('touchend', e => {
+        const tip = e.target.closest('[data-tip]');
         if(tip) {
-            e.preventDefault();
-            document.querySelectorAll('.tip.tip-show').forEach(t => { if(t!==tip) t.classList.remove('tip-show'); });
-            tip.classList.toggle('tip-show');
+            document.querySelectorAll('.tip-show').forEach(t => { if(t!==tip) t.classList.remove('tip-show'); });
         } else {
-            document.querySelectorAll('.tip.tip-show').forEach(t => t.classList.remove('tip-show'));
+            document.querySelectorAll('.tip-show').forEach(t => t.classList.remove('tip-show'));
         }
-    }, { passive: false });
+    }, { passive: true });
 
     // switchMode 호출 시 하단 네비도 업데이트
     const origSwitch = window.switchMode;
@@ -748,7 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ── 비밀번호 잠금 ──
-const CORRECT_PW = '1234'; // ← 비밀번호 변경 시 이 값만 수정하세요
+const CORRECT_PW = '1234';
 
 function checkPW() {
     const input = document.getElementById('pwInput').value;
@@ -846,12 +900,13 @@ let parsedA = null, chartA = null, chartCompare = null;
 let curTabA = 'date';
 setupDrop('dzA', 'fiA', loadA);
 
-document.querySelectorAll('#tabsA .tab').forEach(t=>t.addEventListener('click',()=>{
-  document.querySelectorAll('#tabsA .tab').forEach(x=>x.classList.remove('on'));
-  t.classList.add('on'); curTabA=t.dataset.t;
-  if(parsedA) renderA();
-}));
-['storeSel','metSel'].forEach(id=>document.getElementById(id).addEventListener('change',()=> {if(parsedA) renderA()}));
+function clickTabA(btn) {
+    document.querySelectorAll('#tabsA .tab').forEach(x=>x.classList.remove('on'));
+    btn.classList.add('on');
+    curTabA = btn.dataset.t;
+    if(parsedA) renderA();
+}
+['storeSel','metSel'].forEach(id=>document.getElementById(id).addEventListener('change',()=>{ if(parsedA) renderA(); }));
 
 async function loadA(files){
   if(!files || files.length === 0) return;
@@ -1179,6 +1234,42 @@ function drawTblA(heads,rows,aligns){
   document.querySelector('#tblA thead').innerHTML='<tr>'+heads.map((h,i)=>`<th${aligns[i]==='num'?' class="num"':''}>${h}</th>`).join('')+'</tr>';
   document.querySelector('#tblA tbody').innerHTML=rows.map(r=>'<tr>'+r.map((c,i)=>`<td${aligns[i]==='num'?' class="num"':''}>${c}</td>`).join('')+'</tr>').join('');
 }
+
+function downloadExcelA() {
+    if(!parsedA) return;
+    const m = document.getElementById('metSel').value;
+    const storeSel = document.getElementById('storeSel').value;
+    const wb = XLSX.utils.book_new();
+
+    // 현재 탭 기준으로 테이블 데이터 추출
+    const heads = Array.from(document.querySelectorAll('#tblA thead th')).map(th=>th.innerText);
+    const rows  = Array.from(document.querySelectorAll('#tblA tbody tr')).map(tr=>
+        Array.from(tr.querySelectorAll('td')).map(td=>td.innerText.trim())
+    );
+    if(!rows.length) { alert('먼저 데이터를 분석해주세요.'); return; }
+
+    const wsData = [heads, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = heads.map(()=>({wch:18}));
+    const tabNames = {date:'일자별', month:'월별', weekday:'요일별', hour:'시간대별', store:'가맹점', cross:'히트맵', weekdayCross:'요일히트맵'};
+    const sheetName = tabNames[curTabA] || '분석데이터';
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+    // 전체 원본 데이터도 추가
+    const rawData = parsedA
+        .filter(r => storeSel === 'ALL' || r.store === storeSel)
+        .map(r => ({
+            '일자': r.date, '요일': r.day, '매장': r.store.replace('맛나감자탕 ',''),
+            '실매출액': r.slots['합계']?.amt||0,
+            '매출건수': r.slots['합계']?.cnt||0,
+            '고객수':   r.slots['합계']?.cust||0
+        }));
+    const wsRaw = XLSX.utils.json_to_sheet(rawData);
+    wsRaw['!cols'] = [{wch:12},{wch:6},{wch:12},{wch:14},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, wsRaw, '원본데이터');
+
+    XLSX.writeFile(wb, `맛나감자탕_${sheetName}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
 function resetA(){
     parsedA=null;
     document.getElementById('upA').classList.remove('hidden');
@@ -1232,7 +1323,7 @@ function renderSearchA(keyword) {
 function copyForAIA() {
     if(!parsedA || parsedA.length === 0) return; const m = document.getElementById('metSel').value; const store = document.getElementById('storeSel').value; const metricName = {amt:'실매출액', cnt:'매출건수', cust:'고객수'}[m];
     let report = `[맛나감자탕 분석 데이터 요약 - ${curTabA}]\n지표: ${metricName}, 매장: ${store}\n\n`; const ths = Array.from(document.querySelectorAll('#tblA th')).map(th => th.innerText.trim()).join('\t'); report += ths + '\n';
-    const trs = Array.from(document.querySelectorAll('#tblA tbody tr')).slice(0, 30); trs.forEach(tr => { report += Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()).join('\t') + '\n'; }); report += `\n\n위 데이터를 분석해서 우리 매장의 매출 증대를 위한 맞춤형 마케팅 및 운영 전략 3가지를 구체적으로 제안해줘.`; navigator.clipboard.writeText(report).then(() => alert("제미나이(AI) 질문 데이터가 복사되었습니다!"));
+    const trs = Array.from(document.querySelectorAll('#tblA tbody tr')).slice(0, 30); trs.forEach(tr => { report += Array.from(tr.querySelectorAll('td')).map(td => td.innerText.trim()).join('\t') + '\n'; }); report += `\n\n위 데이터를 분석해서 우리 매장의 매출 증대를 위한 맞춤형 마케팅 및 운영 전략 3가지를 구체적으로 제안해줘.`; copyToClipboard(report, 'AI 질문 데이터가 복사되었습니다!\nClaude나 ChatGPT에 붙여넣어 사용하세요.');
 }
 
 // ==========================================
@@ -1477,12 +1568,12 @@ function renderB(){
     const topMenu = [...parsedB].sort((a,b)=>b.tn-a.tn)[0];
 
     document.getElementById('metsB').innerHTML = `
-        <div class="mc tip" data-tip="전체 실매출액 합계\n실매출액 = 총매출액 − 할인액" style="border-left-color:#1e293b"><div class="mc-l">전체 실매출 합계</div><div class="mc-v">${fmt(total)}원</div></div>
-        <div class="mc tip" data-tip="일반 홀 + 티오더(홀) 합산\n배달·포장 제외한 매장 내 취식 매출" style="border-left-color:var(--primary-accent)"><div class="mc-l">홀 매출 (일반+티오더)</div><div class="mc-v">${fmt(hall)}원 <span style="font-size:13px;color:#64748b">(${hallPct}%)</span></div></div>
-        <div class="mc tip" data-tip="배달앱(배민·요기요·쿠팡 등) 주문 매출\n★ 배달은 독립 측정 — 감자탕·뼈찜 등 카테고리에 포함되지 않습니다" style="border-left-color:#ef4444"><div class="mc-l">배달 매출 (독립)</div><div class="mc-v" style="color:#ef4444">${fmt(del)}원 <span style="font-size:13px;color:#ef4444;opacity:.8">(${delPct}%)</span></div></div>
-        <div class="mc tip" data-tip="포장 주문 매출\n포장은 카테고리에 포함 — 감자탕 포장 주문은 감자탕 카테고리와 포장 탭 양쪽에 집계됩니다" style="border-left-color:#10b981"><div class="mc-l">포장 매출</div><div class="mc-v" style="color:#10b981">${fmt(take)}원 <span style="font-size:13px;color:#10b981;opacity:.8">(${takePct}%)</span></div></div>
-        <div class="mc tip" data-tip="현재 선택된 매장·필터 기준 고유 메뉴 종류 수" style="border-left-color:#f59e0b"><div class="mc-l">분석 메뉴 수</div><div class="mc-v">${menuCount}종</div></div>
-        <div class="mc tip" data-tip="실매출액 기준 1위 메뉴" style="border-left-color:#8b5cf6"><div class="mc-l">베스트 메뉴</div><div class="mc-v" style="font-size:13px;color:#7c3aed">${topMenu?.name||'-'}</div></div>
+        <div class="mc" data-tip="전체 실매출액 합계\n실매출액 = 총매출액 − 할인액" style="border-left-color:#1e293b"><div class="mc-l">전체 실매출 합계</div><div class="mc-v">${fmt(total)}원</div></div>
+        <div class="mc" data-tip="일반 홀 + 티오더(홀) 합산\n배달·포장 제외한 매장 내 취식 매출" style="border-left-color:var(--primary-accent)"><div class="mc-l">홀 매출 (일반+티오더)</div><div class="mc-v">${fmt(hall)}원 <span style="font-size:13px;color:#64748b">(${hallPct}%)</span></div></div>
+        <div class="mc" data-tip="배달앱(배민·요기요·쿠팡 등) 주문 매출\n★ 배달은 독립 측정 — 감자탕·뼈찜 등 카테고리에 포함되지 않습니다" style="border-left-color:#ef4444"><div class="mc-l">배달 매출 (독립)</div><div class="mc-v" style="color:#ef4444">${fmt(del)}원 <span style="font-size:13px;color:#ef4444;opacity:.8">(${delPct}%)</span></div></div>
+        <div class="mc" data-tip="포장 주문 매출\n포장은 카테고리에 포함 — 감자탕 포장 주문은 감자탕 카테고리와 포장 탭 양쪽에 집계됩니다" style="border-left-color:#10b981"><div class="mc-l">포장 매출</div><div class="mc-v" style="color:#10b981">${fmt(take)}원 <span style="font-size:13px;color:#10b981;opacity:.8">(${takePct}%)</span></div></div>
+        <div class="mc" data-tip="현재 선택된 매장·필터 기준 고유 메뉴 종류 수" style="border-left-color:#f59e0b"><div class="mc-l">분석 메뉴 수</div><div class="mc-v">${menuCount}종</div></div>
+        <div class="mc" data-tip="실매출액 기준 1위 메뉴" style="border-left-color:#8b5cf6"><div class="mc-l">베스트 메뉴</div><div class="mc-v" style="font-size:13px;color:#7c3aed">${topMenu?.name||'-'}</div></div>
     `;
 
     const tabTips = {
@@ -1499,7 +1590,7 @@ function renderB(){
         '포장':'포장 채널로 주문된 메뉴만 표시\n※ 포장으로 나간 뼈찜은 뼈찜 탭과 이 탭 양쪽에 집계됩니다',
         '기타':'기타 품목만 표시'
     };
-    document.getElementById('tabsFilterB').innerHTML = ["전체", ...userTabsB].map(m=>`<button class="tab tip ${activeFilterB===m?'on':''}" data-tip="${tabTips[m]||m}" onclick="setFilterB('${m}')">${m}</button>`).join('');
+    document.getElementById('tabsFilterB').innerHTML = ["전체", ...userTabsB].map(m=>`<button class="tab ${activeFilterB===m?'on':''}" title="${tabTips[m]||m}" onclick="setFilterB('${m}')">${m}</button>`).join('');
     renderBTable();
 
     // 카테고리별 요약 테이블
@@ -1531,7 +1622,7 @@ function renderB(){
             • <b>배달은 독립 측정</b> — 배달로 주문된 메뉴는 배달 탭에서만 집계됩니다.<br>
             • <b>포장은 카테고리에 포함</b> — 감자탕을 포장 주문하면 감자탕 카테고리에 포함되고, 포장 탭에서도 볼 수 있습니다.
         </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:680px;">
             <thead>
                 <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
                     <th rowspan="2" style="padding:8px 12px;text-align:left;font-weight:700;color:#374151;vertical-align:middle;">카테고리</th>
@@ -1562,7 +1653,7 @@ function renderB(){
                     };
                     const hasTake = r.catTake > 0;
                     const hasDel  = r.catDel  > 0;
-                    return `<tr class="tip" data-tip="${tipMap[r.cat]||r.cat}" style="border-bottom:1px solid #f1f5f9;${i%2?'background:#fafafa':''};cursor:pointer;" onclick="setFilterB('${r.cat}')">
+                    return `<tr style="border-bottom:1px solid #f1f5f9;${i%2?'background:#fafafa':''};cursor:pointer;" onclick="setFilterB('${r.cat}')">
                         <td style="padding:9px 12px;">
                             <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${r.color};margin-right:7px;vertical-align:middle;"></span>
                             <b>${r.cat}</b>
@@ -1684,7 +1775,7 @@ function copyForAIB() {
     const totalSales = parsedB.reduce((s, x) => s + x.tn, 0);
     let tableData = (activeFilterB === "전체") ? [...parsedB] : (activeFilterB === "배달") ? parsedB.filter(r => r.ch['배달'] > 0 || r.cat === '배달') : (activeFilterB === "포장") ? parsedB.filter(r => r.ch['포장'] > 0 || r.cat === '포장') : parsedB.filter(r => r.cat === activeFilterB);
     const sorted = tableData.filter(r => getNetByTab(r, activeFilterB) > 0).sort((a, b) => getNetByTab(b, activeFilterB) - getNetByTab(a, activeFilterB));
-    let report = `[맛나감자탕 상품/메뉴 매출 데이터 요약 - 필터: ${activeFilterB}]\n\n`; report += sorted.slice(0, 30).map((r, i) => { const dNet = getNetByTab(r, activeFilterB); return `${i+1}위: ${r.name} (${r.cat}) - 판매수량: ${r.tq}개 / 매출액: ${fmt(dNet)}원 (전체대비 ${((dNet/totalSales)*100).toFixed(1)}%)`; }).join('\n'); report += `\n\n위 데이터를 분석하여 우리 매장의 객단가를 높이고 회전율을 개선할 수 있는 구체적인 메뉴 구성 및 프로모션 전략 3가지를 제안해줘.`; navigator.clipboard.writeText(report).then(() => alert("제미나이(AI) 질문 데이터가 복사되었습니다!"));
+    let report = `[맛나감자탕 상품/메뉴 매출 데이터 요약 - 필터: ${activeFilterB}]\n\n`; report += sorted.slice(0, 30).map((r, i) => { const dNet = getNetByTab(r, activeFilterB); return `${i+1}위: ${r.name} (${r.cat}) - 판매수량: ${r.tq}개 / 매출액: ${fmt(dNet)}원 (전체대비 ${((dNet/totalSales)*100).toFixed(1)}%)`; }).join('\n'); report += `\n\n위 데이터를 분석하여 우리 매장의 객단가를 높이고 회전율을 개선할 수 있는 구체적인 메뉴 구성 및 프로모션 전략 3가지를 제안해줘.`; copyToClipboard(report, 'AI 질문 데이터가 복사되었습니다!\nClaude나 ChatGPT에 붙여넣어 사용하세요.');
 }
 
 function resetB(){
@@ -2302,7 +2393,7 @@ function copyForAIC() {
     r+=`\n\n■ 요일별 총매출\n`+DAY_ORDER.filter(d=>W.dayAgg[d]>0).map(d=>`${d}요일: ${fmt(W.dayAgg[d])}원`).join(' | ');
     r+=`\n\n■ 시간대별 총매출\n`+SEGS.map(s=>({...s,sales:s.hours.reduce((sum,h)=>sum+(W.hourAgg[h]||0),0)})).filter(s=>s.sales>0).map(s=>`${s.name}: ${fmt(s.sales)}원`).join(' | ');
     r+=`\n\n위 데이터를 바탕으로 이 매장의 현재 상황을 진단하고, 매출 극대화를 위한 구체적 실행 방안 5가지를 단계별로 제시해줘.`;
-    navigator.clipboard.writeText(r).then(()=>alert('AI 경영 상담 데이터 복사 완료! Claude나 ChatGPT에 붙여넣어 활용하세요.'));
+    copyToClipboard(r, 'AI 경영 상담 데이터 복사 완료!\nClaude나 ChatGPT에 붙여넣어 활용하세요.');
 }
 
 </script>
