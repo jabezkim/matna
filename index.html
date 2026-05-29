@@ -1180,7 +1180,7 @@ function normalizeMenuName(rawName) {
     if (/감자탕\(커플\)|목뼈감자탕\(커플\)/.test(name)) return '목뼈감자탕(커플)';
     if (name.includes('라면옹심이')) return '목뼈라면옹심이';
     if (name.includes('목뼈중화면')) return '목뼈중화면(식사)';
-    if (name.includes('불뼈구이')) return name.replace('불뼈구이', '맥반석불뼈구이');
+    if (name.includes('불뼈구이')) return name.replace('불뼈구이', '맥반석불뼈구이').replace(/맥반석맥반석/g, '맥반석');
     if (name.includes('간장뼈구이')) return name.replace('간장뼈구이', '간장목뼈구이');
     if (name.includes('우거지해장국') && name.includes('고기없는')) return '우거지해장국(고기없음)';
     if (name.includes('볶음밥(탕)') || name.includes('볶음밥(찜)') || name.includes('셀프볶음밥')) return '볶음밥';
