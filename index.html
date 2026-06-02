@@ -1207,7 +1207,7 @@ function getCategory(name, rawCat, ch) {
     if (name.includes('뼈구이드신분') || name.includes('뼈찜드신분')) return '기타';
     const 기타음료 = ['이프로부족할때복숭아500ml','게토레이레몬600ml','캐나다드라이진저에일250ml','초정탄산수500ml','자몽에이드1L'];
     if (기타음료.some(k=>name.includes(k.replace(/\s/g,'')))) return '음료';
-    const 기타사리 = ['폭탄치즈(150g)','포켓몬조미김','찜국물','감자추가','김가루','납작당면','계란찜','킬바사소시지(1개)'];
+    const 기타사리 = ['폭탄치즈(150g)','포켓몬조미김','찜국물','감자추가','김가루','납작당면','계란찜','킬바사소시지(1개)','폭탄치즈','버터밥'];
     if (기타사리.some(k=>name===k.replace(/\s/g,''))) return '사리';
     if (['등심돈까스','치즈돈까스'].some(k=>name===k)) return '식사';
     if (/볶음밥\([23]인분\)/.test(name)) return '사리';
