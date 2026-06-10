@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
+<html lang="ko"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>맛나감자탕 매출 분석</title>
@@ -13,8 +11,8 @@
     <meta name="application-name" content="맛나감자탕">
     <meta name="description" content="맛나감자탕 POS 통합 매출 분석 시스템">
 
-    <link rel="manifest" id="pwaManifest">
-    <link rel="apple-touch-icon" id="appleIcon">
+    <link rel="manifest" id="pwaManifest" href="blob:https://jabezkim.github.io/d7960634-0f88-4311-9abe-276ab2e324cf">
+    <link rel="apple-touch-icon" id="appleIcon" href="blob:https://jabezkim.github.io/c2308944-c61e-4834-bf3e-950467d5ce14">
 
     <script>
     // ── PWA 매니페스트 + 아이콘 동적 생성 ──
@@ -214,7 +212,7 @@ self.addEventListener('fetch', e => {
 </head>
 <body>
 
-<div id="lockScreen" style="position:fixed;inset:0;background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 50%,#0f172a 100%);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+<div id="lockScreen" style="position: fixed; inset: 0px; background: linear-gradient(135deg, rgb(15, 23, 42) 0%, rgb(30, 58, 95) 50%, rgb(15, 23, 42) 100%); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 0px; transition: opacity 0.4s; opacity: 0;">
     <div style="text-align:center;margin-bottom:32px;">
         <div style="font-size:48px;margin-bottom:12px;">🦴</div>
         <h1 style="color:#fff;font-size:26px;font-weight:800;margin:0 0 6px;">맛나감자탕</h1>
@@ -222,11 +220,8 @@ self.addEventListener('fetch', e => {
     </div>
     <div style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:36px 40px;width:320px;text-align:center;backdrop-filter:blur(10px);">
         <div style="color:#e2e8f0;font-size:15px;font-weight:600;margin-bottom:20px;"><i class="ti ti-lock"></i> 접근 비밀번호를 입력하세요</div>
-        <input type="password" id="pwInput" placeholder="비밀번호"
-            style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:12px;"
-            onkeydown="if(event.key==='Enter') checkPW()">
-        <button onclick="checkPW()"
-            style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+        <input type="password" id="pwInput" placeholder="비밀번호" style="width:100%;box-sizing:border-box;padding:12px 16px;border-radius:8px;border:1.5px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.1);color:#fff;font-size:16px;text-align:center;letter-spacing:4px;outline:none;margin-bottom:12px;" onkeydown="if(event.key==='Enter') checkPW()">
+        <button onclick="checkPW()" style="width:100%;padding:12px;border-radius:8px;border:none;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:12px;">
             <i class="ti ti-login"></i> 입장하기
         </button>
         <div id="pwError" style="color:#f87171;font-size:13px;min-height:20px;"></div>
@@ -300,9 +295,7 @@ self.addEventListener('fetch', e => {
                     <p style="margin-bottom:6px;font-size:14px;"><b>[일자별/시간대별]</b> 엑셀 파일을 선택하세요.</p>
                     <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
-                        <input type="file" id="fiA" multiple
-                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;"
-                            ondragover="event.preventDefault();" ondrop="event.preventDefault();">
+                        <input type="file" id="fiA" multiple="" style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;" ondragover="event.preventDefault();" ondrop="event.preventDefault();">
                     </div>
                 </div>
             </div>
@@ -327,11 +320,8 @@ self.addEventListener('fetch', e => {
                 
                 <div class="search-bar">
                     <i class="ti ti-search" style="color:#64748b;font-size:18px;flex-shrink:0;"></i>
-                    <input type="text" id="storeSearchInput" placeholder="매장명 또는 날짜 검색 (예: 군산, 2025-03, 월요일…)"
-                        style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;"
-                        oninput="renderSearchA(this.value)">
-                    <button onclick="document.getElementById('storeSearchInput').value='';renderSearchA('');"
-                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
+                    <input type="text" id="storeSearchInput" placeholder="매장명 또는 날짜 검색 (예: 군산, 2025-03, 월요일…)" style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;" oninput="renderSearchA(this.value)">
+                    <button onclick="document.getElementById('storeSearchInput').value='';renderSearchA('');" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
                 </div>
                 <div id="searchResultA" class="hidden">
                     <div class="panel" style="margin-bottom:1.25rem;">
@@ -403,9 +393,7 @@ self.addEventListener('fetch', e => {
                     <p style="margin-bottom:6px;font-size:14px;"><b>[상품별 매출]</b> 엑셀 파일을 선택하세요.</p>
                     <small style="color:#9ca3af;font-size:12px;">PC: 파일을 이 영역에 드래그 / 모바일: 아래 버튼 탭</small>
                     <div style="margin-top:20px;">
-                        <input type="file" id="fiB" multiple
-                            style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;"
-                            ondragover="event.preventDefault();" ondrop="event.preventDefault();">
+                        <input type="file" id="fiB" multiple="" style="display:block;width:100%;padding:14px;font-size:16px;border:2px solid #4f46e5;border-radius:10px;background:#4f46e5;color:#fff;font-weight:700;cursor:pointer;-webkit-appearance:none;appearance:none;" ondragover="event.preventDefault();" ondrop="event.preventDefault();">
                     </div>
                 </div>
             </div>
@@ -419,11 +407,8 @@ self.addEventListener('fetch', e => {
                 </div>
                 <div class="search-bar">
                     <i class="ti ti-search" style="color:#64748b;font-size:18px;flex-shrink:0;"></i>
-                    <input type="text" id="menuSearchInput" placeholder="메뉴 키워드 검색 (예: 목뼈감자탕, 뼈찜, 볶음밥…)"
-                        style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;"
-                        oninput="renderMenuSearch(this.value)">
-                    <button onclick="document.getElementById('menuSearchInput').value='';renderMenuSearch('');"
-                        style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
+                    <input type="text" id="menuSearchInput" placeholder="메뉴 키워드 검색 (예: 목뼈감자탕, 뼈찜, 볶음밥…)" style="flex:1;border:none;background:transparent;font-size:14px;outline:none;color:#1e293b;" oninput="renderMenuSearch(this.value)">
+                    <button onclick="document.getElementById('menuSearchInput').value='';renderMenuSearch('');" style="background:none;border:none;cursor:pointer;color:#94a3b8;font-size:18px;padding:0;">✕</button>
                 </div>
                 <div id="menuSearchResult" class="hidden">
                     <div class="panel" style="margin-bottom:1.25rem;">
@@ -531,7 +516,7 @@ self.addEventListener('fetch', e => {
                                 </select>
                                 <select id="monthlyN" onchange="triggerRenderC('monthly')">
                                     <option value="3">TOP 3</option>
-                                    <option value="5" selected>TOP 5</option>
+                                    <option value="5" selected="">TOP 5</option>
                                     <option value="7">TOP 7</option>
                                     <option value="10">TOP 10</option>
                                 </select>
@@ -565,7 +550,7 @@ self.addEventListener('fetch', e => {
                                 <select id="weekdayN" onchange="triggerRenderC('weekday')">
                                     <option value="3">TOP 3</option>
                                     <option value="5">TOP 5</option>
-                                    <option value="7" selected>TOP 7</option>
+                                    <option value="7" selected="">TOP 7</option>
                                     <option value="10">TOP 10</option>
                                 </select>
                             </div>
@@ -597,7 +582,7 @@ self.addEventListener('fetch', e => {
                                 </select>
                                 <select id="dailyN" onchange="triggerRenderC('daily')">
                                     <option value="3">TOP 3</option>
-                                    <option value="5" selected>TOP 5</option>
+                                    <option value="5" selected="">TOP 5</option>
                                     <option value="7">TOP 7</option>
                                     <option value="10">TOP 10</option>
                                 </select>
@@ -630,7 +615,7 @@ self.addEventListener('fetch', e => {
                                 <select id="hourlyN" onchange="triggerRenderC('hourly')">
                                     <option value="3">TOP 3</option>
                                     <option value="5">TOP 5</option>
-                                    <option value="7" selected>TOP 7</option>
+                                    <option value="7" selected="">TOP 7</option>
                                     <option value="10">TOP 10</option>
                                 </select>
                             </div>
@@ -994,12 +979,12 @@ function parseA(raw){
     const row = raw[r]; if(!row || row.length === 0) continue;
     const checkCell = String(row[colMap[0]?.col] || ''); if (checkCell.includes('매출') || checkCell.includes('건수') || checkCell.includes('고객')) continue;
     let dateVal = String(row[0]||'').trim(), dayVal = String(row[1]||'').trim(), storeVal = String(row[storeCol]||'').trim(); 
-    if (/^4\d{4}$/.test(dateVal)) { const d = new Date(Math.round((parseInt(dateVal) - 25569) * 86400000)); dateVal = `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; }
+    if (/^4\d{4}$/.test(dateVal)) { const d = new Date(Math.round((parseInt(dateVal) - 25569) * 86400000)); dateVal = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`; }
     if (dateVal === '합계' || storeVal === '합계') continue;
     if (!dateVal && lastDate) { dateVal=lastDate; dayVal=lastDay; } else if (dateVal && !dateVal.startsWith('소계')) { lastDate=dateVal; lastDay=dayVal; }
     if (dateVal.startsWith('소계') || storeVal.includes('소계') || storeVal.match(/^[0-9]+개$/) || !storeVal) continue; 
     if (dateVal.startsWith('소계:')) dateVal = dateVal.replace('소계:','').trim();
-    if (dateVal.length >= 10 && dateVal.indexOf('-') === 4) dateVal = dateVal.substring(5); 
+    // YYYY-MM-DD 형식 그대로 유지 (연도 포함)
     const rec = { date:dateVal, day:dayVal, store:storeVal, slots:{} }; let hasValidData = false;
     colMap.forEach(({slot, col}) => { const amt = pn(row[col]), cnt = pn(row[col+1]), cust = pn(row[col+2]); rec.slots[slot] = {amt, cnt, cust}; if(amt > 0 || cnt > 0) hasValidData = true; });
     if (hasValidData) records.push(rec);
@@ -1046,15 +1031,24 @@ function renderComparisonChart(allData, storeName, m, tab) {
 
 function renderDateA(data,m){
   const agg={}; data.forEach(r=>{ const s = r.slots['합계']||{}; if(!agg[r.date]) agg[r.date]={ date: r.date, day: r.day, amt:0, cnt:0, cust:0 }; agg[r.date].amt+=s.amt||0; agg[r.date].cnt+=s.cnt||0; agg[r.date].cust+=s.cust||0; });
-  const rows = Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>({label: `${x.date}(${x.day})`,val: x[m] || 0}));
+  const rows = Object.values(agg).sort((a,b)=>a.date.localeCompare(b.date)).map(x=>{
+      // 차트용: MM-DD(요일), 표용: YYYY-MM-DD(요일)
+      const shortDate = x.date.length >= 10 ? x.date.substring(5) : x.date;
+      return {label: `${x.date}(${x.day})`, chartLabel: `${shortDate}(${x.day})`, val: x[m] || 0};
+  });
   const total = rows.reduce((s,x)=>s+x.val,0), peak = rows.length ? rows.reduce((a,b)=>b.val>a.val?b:a,rows[0]) : {label:'-',val:0};
   setMetsA([{l:`총 ${metLabelA()}`, v:fmtA(total,m)}, {l:'최고 성과 일자', v:peak.label}, {l:'일자 최고치 값', v:fmtA(peak.val,m)}, {l:'총 집계 일수', v:rows.length+'일'}]);
-  drawBarA(`일자별 누적 ${metLabelA()}`, rows.map(r=>r.label), rows.map(r=>r.val), m);
+  drawBarA(`일자별 누적 ${metLabelA()}`, rows.map(r=>r.chartLabel), rows.map(r=>r.val), m);
   drawTblA(['분석 일자', `총 ${metLabelA()}`, '전체 대비 비중'], rows.map(r=>[r.label, fmtA(r.val,m), (total>0?(r.val/total*100).toFixed(1):0)+'%']), ['','num','num']);
 }
 
 function renderMonthA(data, m) {
-  function getMonthKey(date) { const parts = date.split('-'); if(parts.length === 3) return parts[0]+'-'+parts[1]+'월'; if(parts.length === 2) return parts[0]+'월'; return date.substring(0,2)+'월'; }
+  function getMonthKey(date) {
+      const parts = date.split('-');
+      if(parts.length === 3) return parts[0]+'-'+parts[1]+'월';  // 2025-06 → "2025-06월"
+      if(parts.length === 2) return parts[0]+'월';               // MM-DD → "MM월" (구형 호환)
+      return date.substring(0,2)+'월';
+  }
   const agg = {}; data.forEach(r => { const s = r.slots['합계']||{}; const mk = getMonthKey(r.date); if(!agg[mk]) agg[mk] = { month: mk, amt:0, cnt:0, cust:0, days: new Set() }; agg[mk].amt+=s.amt||0; agg[mk].cnt+=s.cnt||0; agg[mk].cust+=s.cust||0; agg[mk].days.add(r.date); });
   const rows = Object.values(agg).sort((a,b)=>a.month.localeCompare(b.month)); if(!rows.length) return;
   const total=rows.reduce((s,x)=>s+x[m],0); const peak=rows.reduce((a,b)=>b[m]>a[m]?b:a, rows[0]); const avgDay=rows.map(r=>r[m]/(r.days.size||1)); const peakAvg=rows.reduce((a,b,i)=>avgDay[i]>avgDay[a.idx]?{idx:i,...b}:{...a}, {idx:0,...rows[0]});
@@ -1254,8 +1248,25 @@ async function loadB(files){
           if(CI.date >= 0) {
               const rawDate = r[CI.date];
               if(rawDate) {
-                  if(typeof rawDate === 'number') { const d = new Date(Math.round((rawDate - 25569) * 86400 * 1000)); const mm = String(d.getMonth()+1).padStart(2,'0'); const dd = String(d.getDate()).padStart(2,'0'); date = `${mm}-${dd}`; } 
-                  else { const s = String(rawDate).trim(); const m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/); if(m) date = `${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`; else { const m2 = s.match(/(\d{1,2})[.\-\/](\d{1,2})/); if(m2) date = `${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`; else date = s.substring(0,10); } }
+                  if(typeof rawDate === 'number') {
+                      // 엑셀 시리얼 → YYYY-MM-DD
+                      const d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+                      const yyyy = d.getUTCFullYear();
+                      const mm = String(d.getUTCMonth()+1).padStart(2,'0');
+                      const dd = String(d.getUTCDate()).padStart(2,'0');
+                      date = `${yyyy}-${mm}-${dd}`;
+                  } else {
+                      const s = String(rawDate).trim();
+                      // YYYY-MM-DD, YYYY/MM/DD, YYYY.MM.DD → YYYY-MM-DD
+                      const m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+                      if(m) date = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+                      else {
+                          // MM-DD 구형 형식 그대로 유지
+                          const m2 = s.match(/(\d{1,2})[.\-\/](\d{1,2})/);
+                          if(m2) date = `${m2[1].padStart(2,'0')}-${m2[2].padStart(2,'0')}`;
+                          else date = s.substring(0,10);
+                      }
+                  }
               }
           }
           let store = fileStoreName; if(CI.store >= 0) { const s = String(r[CI.store]||'').trim(); if(s && s !== '합계' && s !== '소계') store = s; }
@@ -1387,7 +1398,9 @@ function calcWeights(dataA, totalA) {
     const safe = totalA || 1; const dayAgg={'일':0,'월':0,'화':0,'수':0,'목':0,'금':0,'토':0}; const segAgg={morning:0,lunch:0,extra:0,dinner:0,night:0}; const hourAgg={}, monthAgg={}, dateAgg={}; HOURS.forEach(h=>hourAgg[h]=0);
     dataA.forEach(r=>{
         const amt = r.slots['합계']?.amt||0; dayAgg[r.day] = (dayAgg[r.day]||0) + amt;
-        const parts = r.date.split('-'); const mKey = (parts.length===2 ? parts[0] : parts.length===3 ? parts[1] : r.date.substring(0,2)) + '월';
+        const parts = r.date.split('-');
+        // YYYY-MM-DD → "YYYY-MM월", MM-DD → "MM월" (구형 호환)
+        const mKey = (parts.length===3 ? parts[0]+'-'+parts[1] : parts[0]) + '월';
         monthAgg[mKey] = (monthAgg[mKey]||0) + amt; dateAgg[r.date] = (dateAgg[r.date]||0) + amt;
         HOURS.forEach(h=>{ const sk=getSegKey(h); if(sk) segAgg[sk]+=(r.slots[h]?.amt||0); hourAgg[h]+=(r.slots[h]?.amt||0); });
     });
@@ -1752,5 +1765,5 @@ function copyForAIC() {
     copyToClipboard(report, 'AI 경영 상담 데이터 복사 완료!\\n현재 화면에 선택하신 데이터가 복사되었습니다.\\nClaude나 ChatGPT에 붙여넣어 활용하세요.');
 }
 </script>
-</body>
-</html>
+
+</body></html>
